@@ -19,3 +19,14 @@ cmake .. -DSDL3_DIR="full/path/to/SDL/build"
 then run `make` or your favorite IDE.
 
 The shaders in the repository are written in HLSL and offline compiled from `Content/Shaders/Source` to `Content/Shaders/Compiled` using [SDL_shadercross](https://github.com/libsdl-org/SDL_shadercross). If you want to build the shaders yourself, you must install `SDL_shadercross`, navigate to the shader source directory, and call `compile.sh`.
+
+## PETEHUF_TODO:
+
+* git submodule SDL3
+* compile as C++
+* import glTF support libs
+* create new example based on DepthSampler.c
+* port vkglTF from https://github.com/SaschaWillems/Vulkan-glTF-PBR via https://github.com/PeteHuf/SDL-glTF-PBR
+* load geometry
+* load textures
+* load animation
