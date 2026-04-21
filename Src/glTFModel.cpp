@@ -78,7 +78,7 @@ namespace vkglTF
 	}
 
 	// Loads the image for this texture. Supports both glTF's web formats (jpg, png, embedded and external files) as well as external KTX2 files with basis universal texture compression
-	void Texture::fromglTfImage(tinygltf::Image &gltfimage, std::string path, TextureSampler textureSampler, vks::VulkanDevice *device, vks::DummyQueue* copyQueue)
+	void Texture::fromglTfImage(tinygltf::Image &gltfimage, std::string path, TextureSampler textureSampler, vks::VulkanDevice *device)
 	{
 		// this->device = device;
 		//
@@ -1045,7 +1045,7 @@ namespace vkglTF
 		}
 	}
 
-	void Model::loadTextures(tinygltf::Model &gltfModel, vks::VulkanDevice *device, vks::DummyQueue* transferQueue)
+	void Model::loadTextures(tinygltf::Model &gltfModel, vks::VulkanDevice *device)
 	{
 		for (tinygltf::Texture &tex : gltfModel.textures) {
 			int source = tex.source;
@@ -1068,7 +1068,7 @@ namespace vkglTF
 				textureSampler = textureSamplers[tex.sampler];
 			}
 			vkglTF::Texture texture;
-			texture.fromglTfImage(image, filePath, textureSampler, device, transferQueue);
+			texture.fromglTfImage(image, filePath, textureSampler, device);
 			textures.push_back(texture);
 		}
 	}
@@ -1344,7 +1344,7 @@ namespace vkglTF
 		}
 	}
 
-	void Model::loadFromFile(std::string filename, vks::VulkanDevice* device, vks::DummyQueue* transferQueue, float scale)
+	void Model::loadFromFile(std::string filename, vks::VulkanDevice* device, float scale)
 	{
 		tinygltf::Model gltfModel;
 		tinygltf::TinyGLTF gltfContext;
@@ -1388,7 +1388,7 @@ namespace vkglTF
 			}
 
 			loadTextureSamplers(gltfModel);
-			loadTextures(gltfModel, device, transferQueue);
+			loadTextures(gltfModel, device);
 			loadMaterials(gltfModel);
 
 			const tinygltf::Scene& scene = gltfModel.scenes[gltfModel.defaultScene > -1 ? gltfModel.defaultScene : 0];

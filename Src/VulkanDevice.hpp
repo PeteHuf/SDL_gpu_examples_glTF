@@ -23,9 +23,6 @@
 
 namespace vks
 {
-	// looks like SDL has a global queue via SDL_SubmitGPUCommandBuffer
-	struct DummyQueue {};
-
 	struct VulkanDevice
 	{
 		SDL_Window* window;
@@ -449,7 +446,7 @@ namespace vks
 		* @note The queue that the command buffer is submitted to must be from the same family index as the pool it was allocated from
 		* @note Uses a fence to ensure command buffer has finished executing
 		*/
-		void flushCommandBuffer(SDL_GPUCommandBuffer* commandBuffer, vks::DummyQueue* queue, bool free = true)
+		void flushCommandBuffer(SDL_GPUCommandBuffer* commandBuffer, bool free = true)
 		{
 			std::terminate();
 			// VK_CHECK_RESULT(vkEndCommandBuffer(commandBuffer));

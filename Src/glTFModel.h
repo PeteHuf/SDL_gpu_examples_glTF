@@ -76,7 +76,7 @@ namespace vkglTF
 		SDL_GPUSampler *sampler;
 		void updateDescriptor();
 		void destroy();
-		void fromglTfImage(tinygltf::Image& gltfimage, std::string path, TextureSampler textureSampler, vks::VulkanDevice* device, vks::DummyQueue* copyQueue);
+		void fromglTfImage(tinygltf::Image& gltfimage, std::string path, TextureSampler textureSampler, vks::VulkanDevice* device);
 	};
 
 	struct Material {
@@ -252,13 +252,13 @@ namespace vkglTF
 		void loadNode(vkglTF::Node* parent, const tinygltf::Node& node, uint32_t nodeIndex, const tinygltf::Model& model, LoaderInfo& loaderInfo, float globalscale);
 		void getNodeProps(const tinygltf::Node& node, const tinygltf::Model& model, size_t& vertexCount, size_t& indexCount);
 		void loadSkins(tinygltf::Model& gltfModel);
-		void loadTextures(tinygltf::Model& gltfModel, vks::VulkanDevice* device, vks::DummyQueue* transferQueue);
+		void loadTextures(tinygltf::Model& gltfModel, vks::VulkanDevice* device);
 		SDL_GPUSamplerAddressMode getVkWrapMode(int32_t wrapMode);
 		SDL_GPUFilter getVkFilterMode(int32_t filterMode);
 		void loadTextureSamplers(tinygltf::Model& gltfModel);
 		void loadMaterials(tinygltf::Model& gltfModel);
 		void loadAnimations(tinygltf::Model& gltfModel);
-		void loadFromFile(std::string filename, vks::VulkanDevice* device, vks::DummyQueue* transferQueue, float scale = 1.0f);
+		void loadFromFile(std::string filename, vks::VulkanDevice* device, float scale = 1.0f);
 		void drawNode(Node* node, /*SDL_GPUCommandBuffer* commandBuffer*/ SDL_GPURenderPass* renderPass);
 		void draw(/*SDL_GPUCommandBuffer* commandBuffer*/ SDL_GPURenderPass* renderPass);
 		void calculateBoundingBox(Node* node, Node* parent);
