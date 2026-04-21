@@ -19,19 +19,8 @@ else()
 endif()
 
 add_subdirectory(External/SDL)
-
-#if(NOT SDL3_FOUND)
-#    message(STATUS "SDL3 not found. Building it from source.") # PRECHECKIN: remove
-#    include(FetchContent)
-#    FetchContent_Declare(
-#            SDL
-#            GIT_REPOSITORY https://github.com/libsdl-org/SDL
-#            GIT_TAG        "release-3.2.16"
-#    )
-#    FetchContent_MakeAvailable(SDL)
-#else()
-#    find_package(SDL3 REQUIRED)
-#endif()
+include_directories(External/glm)
+include_directories(External/tinygltf)
 
 add_executable(SDL_gpu_examples
     Examples/main.c
@@ -71,6 +60,9 @@ add_executable(SDL_gpu_examples
     Examples/PullSpriteBatch.c
     Examples/TextureTypeTest.c
     Examples/CompressedTextures.c
+    Src/glTFModel.cpp
+    Src/glTFModel.h
+    Src/VulkanDevice.hpp
 )
 
 target_link_libraries(SDL_gpu_examples
