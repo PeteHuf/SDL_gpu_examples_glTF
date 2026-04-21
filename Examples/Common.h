@@ -91,6 +91,7 @@ typedef struct Example
 	void (*Quit)(Context* context);
 } Example;
 
+extern Example GlTF_Example;
 extern Example ClearScreen_Example;
 extern Example ClearScreenMultiWindow_Example;
 extern Example BasicTriangle_Example;

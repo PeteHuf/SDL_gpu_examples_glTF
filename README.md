@@ -26,9 +26,7 @@ The shaders in the repository are written in HLSL and offline compiled from `Con
 
 ## PETEHUF_TODO:
 
-* compile as C++
 * import glTF support libs
-* create new example based on DepthSampler.c
 * port vkglTF from https://github.com/SaschaWillems/Vulkan-glTF-PBR via https://github.com/PeteHuf/SDL-glTF-PBR
 * load geometry
 * load textures

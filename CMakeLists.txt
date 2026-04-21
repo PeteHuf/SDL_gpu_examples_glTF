@@ -1,19 +1,37 @@
 cmake_minimum_required(VERSION 3.10)
 project(SDL_gpu_examples)
+
+set(CMAKE_CXX_STANDARD 23) # PRECHECKIN: should be in CMakePresets.json file?
+
 find_package(SDL3 CONFIG QUIET)
 
-if(NOT SDL3_FOUND)
-    message(STATUS "SDL3 not found. Building it from source.")
-    include(FetchContent)
-    FetchContent_Declare(
-            SDL
-            GIT_REPOSITORY https://github.com/libsdl-org/SDL
-            GIT_TAG        "release-3.2.16"
-    )
-    FetchContent_MakeAvailable(SDL)
+## treat .c as .cpp
+#file(GLOB_RECURSE C_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.c") # PRECHECKIN: remove, too annoying to port all to cpp?
+#set_source_files_properties(${C_FILES} PROPERTIES LANGUAGE CXX)
+
+
+if(MSVC)
+    set(xpl_compile_options "/Zc:__cplusplus" "/bigobj") # PRECHECKIN: should be in CMakePresets.json file?
+    set(xpl_compile_definitions "_UNICODE" "UNICODE")
 else()
-    find_package(SDL3 REQUIRED)
+    set(xpl_compile_options)
+    set(xpl_compile_definitions)
 endif()
+
+add_subdirectory(External/SDL)
+
+#if(NOT SDL3_FOUND)
+#    message(STATUS "SDL3 not found. Building it from source.") # PRECHECKIN: remove
+#    include(FetchContent)
+#    FetchContent_Declare(
+#            SDL
+#            GIT_REPOSITORY https://github.com/libsdl-org/SDL
+#            GIT_TAG        "release-3.2.16"
+#    )
+#    FetchContent_MakeAvailable(SDL)
+#else()
+#    find_package(SDL3 REQUIRED)
+#endif()
 
 add_executable(SDL_gpu_examples
     Examples/main.c
@@ -47,6 +65,7 @@ add_executable(SDL_gpu_examples
     Examples/BlitCube.c
     Examples/BlitMirror.c
     Examples/GenerateMipmaps.c
+    Examples/GlTF.cpp
     Examples/Latency.c
     Examples/DepthSampler.c
     Examples/PullSpriteBatch.c
