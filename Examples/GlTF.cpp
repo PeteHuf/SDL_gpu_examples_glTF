@@ -20,6 +20,8 @@ static SDL_GPUSampler* EffectSampler;
 static float Time;
 static int SceneWidth, SceneHeight;
 
+#define DISABLE_EFFECT 0
+
 static int Init_cpp(Context* context)
 {
 	int result = CommonInit(context, 0);
@@ -178,8 +180,13 @@ static int Init_cpp(Context* context)
 		// Make them smaller so pixels stand out more
 		int w, h;
 		SDL_GetWindowSizeInPixels(context->Window, &w, &h);
+#if DISABLE_EFFECT
+		SceneWidth = w;
+		SceneHeight = h;
+#else
 		SceneWidth = w / 4;
 		SceneHeight = h / 4;
+#endif
 
 		SDL_GPUTextureCreateInfo colorTextureCreateInfo {
 			.type = SDL_GPU_TEXTURETYPE_2D,
@@ -497,6 +504,7 @@ static int Draw_cpp(Context* context)
 		std::array<float, 2> nearFarPlane{nearPlane, farPlane};
 		SDL_PushGPUFragmentUniformData(cmdbuf, 0, nearFarPlane.data(), 8);
 
+#if !DISABLE_EFFECT
 		SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &colorTargetInfo, 1, &depthStencilTargetInfo);
 		SDL_GPUBufferBinding sceneVertexBufferBinding{.buffer = SceneVertexBuffer, .offset = 0 };
 		SDL_BindGPUVertexBuffers(renderPass, 0, &sceneVertexBufferBinding, 1);
@@ -505,6 +513,7 @@ static int Draw_cpp(Context* context)
 		SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
 		SDL_DrawGPUIndexedPrimitives(renderPass, 36, 1, 0, 0, 0);
 		SDL_EndGPURenderPass(renderPass);
+#endif
 
 		// Render the Outline Effect that samples from the Color/Depth textures
 		SDL_GPUColorTargetInfo swapchainTargetInfo = { 0 };
@@ -513,6 +522,7 @@ static int Draw_cpp(Context* context)
 		swapchainTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
 		swapchainTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
 
+#if !DISABLE_EFFECT
 		renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, nullptr);
 		SDL_BindGPUGraphicsPipeline(renderPass, EffectPipeline);
 		SDL_GPUBufferBinding effectVertexBufferBinding{.buffer = EffectVertexBuffer, .offset = 0 };
@@ -526,6 +536,18 @@ static int Draw_cpp(Context* context)
 		SDL_BindGPUFragmentSamplers(renderPass, 0, textureSamplerBindings.data(), 2);
 		SDL_DrawGPUIndexedPrimitives(renderPass, 6, 1, 0, 0, 0);
 		SDL_EndGPURenderPass(renderPass);
+
+#else
+		SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
+		SDL_GPUBufferBinding sceneVertexBufferBinding{.buffer = SceneVertexBuffer, .offset = 0 };
+		SDL_BindGPUVertexBuffers(renderPass, 0, &sceneVertexBufferBinding, 1);
+		SDL_GPUBufferBinding sceneIndexBufferBinding{ .buffer = SceneIndexBuffer, .offset = 0 };
+		SDL_BindGPUIndexBuffer(renderPass, &sceneIndexBufferBinding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
+		SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
+		SDL_DrawGPUIndexedPrimitives(renderPass, 36, 1, 0, 0, 0);
+		SDL_EndGPURenderPass(renderPass);
+#endif
+
 	}
 
 	SDL_SubmitGPUCommandBuffer(cmdbuf);
