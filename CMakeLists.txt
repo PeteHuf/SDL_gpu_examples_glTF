@@ -61,3 +61,12 @@ target_link_libraries(SDL_gpu_examples
 add_custom_command(TARGET SDL_gpu_examples POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content $<TARGET_FILE_DIR:SDL_gpu_examples>/Content
 )
+
+if(WIN32)
+    # copy the SDL3.dll to the target dir
+    add_custom_command(
+        TARGET SDL_gpu_examples POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SDL3::SDL3-shared> $<TARGET_FILE_DIR:SDL_gpu_examples>
+        VERBATIM
+    )
+endif(WIN32)
