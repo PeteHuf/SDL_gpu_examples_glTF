@@ -9,18 +9,10 @@ extern "C" {
 static SDL_GPUGraphicsPipeline* ScenePipeline;
 static SDL_GPUBuffer* SceneVertexBuffer;
 static SDL_GPUBuffer* SceneIndexBuffer;
-static SDL_GPUTexture* SceneColorTexture;
 static SDL_GPUTexture* SceneDepthTexture;
-
-static SDL_GPUGraphicsPipeline* EffectPipeline;
-static SDL_GPUBuffer* EffectVertexBuffer;
-static SDL_GPUBuffer* EffectIndexBuffer;
-static SDL_GPUSampler* EffectSampler;
 
 static float Time;
 static int SceneWidth, SceneHeight;
-
-#define DISABLE_EFFECT 0
 
 static int Init_cpp(Context* context)
 {
@@ -43,20 +35,6 @@ static int Init_cpp(Context* context)
 		if (sceneFragmentShader == nullptr)
 		{
 			SDL_Log("Failed to create 'SolidColorDepth' fragment shader!");
-			return -1;
-		}
-
-		SDL_GPUShader* effectVertexShader = LoadShader(context->Device, "TexturedQuad.vert", 0, 0, 0, 0);
-		if (effectVertexShader == nullptr)
-		{
-			SDL_Log("Failed to create 'TexturedQuad' vertex shader!");
-			return -1;
-		}
-
-		SDL_GPUShader* effectFragmentShader = LoadShader(context->Device, "DepthOutline.frag", 2, 1, 0, 0);
-		if (effectFragmentShader == nullptr)
-		{
-			SDL_Log("Failed to create 'DepthOutline' fragment shader!");
 			return -1;
 		}
 
@@ -116,92 +94,16 @@ static int Init_cpp(Context* context)
 			return -1;
 		}
 
-		std::array<SDL_GPUVertexBufferDescription, 1> effectVertexBufferDescription{{{
-			.slot = 0,
-			.pitch = sizeof(PositionTextureVertex),
-			.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
-			.instance_step_rate = 0
-		}}};
-		std::array<SDL_GPUVertexAttribute, 2> effectVertexAttribute{{{
-			.location = 0,
-			.buffer_slot = 0,
-			.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
-			.offset = 0
-		}, {
-			.location = 1,
-			.buffer_slot = 0,
-			.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
-			.offset = sizeof(float) * 3
-		}}};
-		std::array<SDL_GPUColorTargetDescription, 1> effectColorTargetDescription{{{
-			.format = SDL_GetGPUSwapchainTextureFormat(context->Device, context->Window),
-			.blend_state = SDL_GPUColorTargetBlendState{
-				.src_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE,
-				.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
-				.color_blend_op = SDL_GPU_BLENDOP_ADD,
-				.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE,
-				.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
-				.alpha_blend_op = SDL_GPU_BLENDOP_ADD,
-				.enable_blend = true,
-			}
-		}}};
-		pipelineCreateInfo = SDL_GPUGraphicsPipelineCreateInfo{
-			.vertex_shader = effectVertexShader,
-			.fragment_shader = effectFragmentShader,
-			.vertex_input_state = SDL_GPUVertexInputState{
-				.vertex_buffer_descriptions = effectVertexBufferDescription.data(),
-				.num_vertex_buffers = 1,
-				.vertex_attributes = effectVertexAttribute.data(),
-				.num_vertex_attributes = 2
-			},
-			.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
-			.target_info = {
-				.color_target_descriptions = effectColorTargetDescription.data(),
-				.num_color_targets = 1,
-			}
-		};
-
-		EffectPipeline = SDL_CreateGPUGraphicsPipeline(context->Device, &pipelineCreateInfo);
-		if (EffectPipeline == nullptr)
-		{
-			SDL_Log("Failed to create Outline Effect pipeline!");
-			return -1;
-		}
-
-		SDL_ReleaseGPUShader(context->Device, effectVertexShader);
-		SDL_ReleaseGPUShader(context->Device, effectFragmentShader);
-
 		SDL_ReleaseGPUShader(context->Device, sceneVertexShader);
 		SDL_ReleaseGPUShader(context->Device, sceneFragmentShader);
 	}
 
 	// Create the Scene Textures
 	{
-		// Make them smaller so pixels stand out more
 		int w, h;
 		SDL_GetWindowSizeInPixels(context->Window, &w, &h);
-#if DISABLE_EFFECT
 		SceneWidth = w;
 		SceneHeight = h;
-#else
-		SceneWidth = w / 4;
-		SceneHeight = h / 4;
-#endif
-
-		SDL_GPUTextureCreateInfo colorTextureCreateInfo {
-			.type = SDL_GPU_TEXTURETYPE_2D,
-			.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
-			.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
-			.width = static_cast<Uint32>(SceneWidth),
-			.height = static_cast<Uint32>(SceneHeight),
-			.layer_count_or_depth = 1,
-			.num_levels = 1,
-			.sample_count = SDL_GPU_SAMPLECOUNT_1
-		};
-		SceneColorTexture = SDL_CreateGPUTexture(
-			context->Device,
-			&colorTextureCreateInfo
-		);
 
 		SDL_GPUTextureCreateInfo depthTextureCreateInfo {
 			.type = SDL_GPU_TEXTURETYPE_2D,
@@ -218,17 +120,6 @@ static int Init_cpp(Context* context)
 			&depthTextureCreateInfo
 		);
 	}
-
-	// Create Outline Effect Sampler
-	SDL_GPUSamplerCreateInfo outlineSamplerCreateInfo{
-		.min_filter = SDL_GPU_FILTER_NEAREST,
-		.mag_filter = SDL_GPU_FILTER_NEAREST,
-		.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST,
-		.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_REPEAT,
-		.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_REPEAT,
-		.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT,
-	};
-	EffectSampler = SDL_CreateGPUSampler(context->Device, &outlineSamplerCreateInfo);
 
 	// Create & Upload Scene Index and Vertex Buffers
 	{
@@ -349,96 +240,6 @@ static int Init_cpp(Context* context)
 		SDL_ReleaseGPUTransferBuffer(context->Device, bufferTransferBuffer);
 	}
 
-	// Create & Upload Outline Effect Vertex and Index buffers
-	{
-		SDL_GPUBufferCreateInfo vertexBufferCreateInfo {
-			.usage = SDL_GPU_BUFFERUSAGE_VERTEX,
-			.size = sizeof(PositionTextureVertex) * 4
-		};
-		EffectVertexBuffer = SDL_CreateGPUBuffer(
-			context->Device,
-			&vertexBufferCreateInfo
-		);
-
-		SDL_GPUBufferCreateInfo indexBufferCreateInfo {
-			.usage = SDL_GPU_BUFFERUSAGE_INDEX,
-			.size = sizeof(Uint16) * 6
-		};
-		EffectIndexBuffer = SDL_CreateGPUBuffer(
-			context->Device,
-			&indexBufferCreateInfo
-		);
-
-		SDL_GPUTransferBufferCreateInfo posTexTransferBufferCreateInfo {
-			.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-			.size = (sizeof(PositionTextureVertex) * 4) + (sizeof(Uint16) * 6)
-		};
-		SDL_GPUTransferBuffer* bufferTransferBuffer = SDL_CreateGPUTransferBuffer(
-			context->Device,
-			&posTexTransferBufferCreateInfo
-		);
-
-		PositionTextureVertex* transferData = static_cast<PositionTextureVertex*>(SDL_MapGPUTransferBuffer(
-			context->Device,
-			bufferTransferBuffer,
-			false
-		));
-
-		transferData[0] = PositionTextureVertex { -1,  1, 0, 0, 0 };
-		transferData[1] = PositionTextureVertex {  1,  1, 0, 1, 0 };
-		transferData[2] = PositionTextureVertex {  1, -1, 0, 1, 1 };
-		transferData[3] = PositionTextureVertex { -1, -1, 0, 0, 1 };
-
-		Uint16* indexData = (Uint16*) &transferData[4];
-		indexData[0] = 0;
-		indexData[1] = 1;
-		indexData[2] = 2;
-		indexData[3] = 0;
-		indexData[4] = 2;
-		indexData[5] = 3;
-
-		SDL_UnmapGPUTransferBuffer(context->Device, bufferTransferBuffer);
-
-		SDL_GPUCommandBuffer* uploadCmdBuf = SDL_AcquireGPUCommandBuffer(context->Device);
-		SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(uploadCmdBuf);
-
-		SDL_GPUTransferBufferLocation vertexTransferBufferLocation{
-			.transfer_buffer = bufferTransferBuffer,
-			.offset = 0
-		};
-		SDL_GPUBufferRegion vertexBufferRegion{
-			.buffer = EffectVertexBuffer,
-			.offset = 0,
-			.size = sizeof(PositionTextureVertex) * 4
-		};
-		SDL_UploadToGPUBuffer(
-			copyPass,
-			&vertexTransferBufferLocation,
-			&vertexBufferRegion,
-			false
-		);
-
-		SDL_GPUTransferBufferLocation indexTransferBufferLocation{
-			.transfer_buffer = bufferTransferBuffer,
-			.offset = sizeof(PositionTextureVertex) * 4
-		};
-		SDL_GPUBufferRegion indexBufferRegion{
-			.buffer = EffectIndexBuffer,
-			.offset = 0,
-			.size = sizeof(Uint16) * 6
-		};
-		SDL_UploadToGPUBuffer(
-			copyPass,
-			&indexTransferBufferLocation,
-			&indexBufferRegion,
-			false
-		);
-
-		SDL_EndGPUCopyPass(copyPass);
-		SDL_SubmitGPUCommandBuffer(uploadCmdBuf);
-		SDL_ReleaseGPUTransferBuffer(context->Device, bufferTransferBuffer);
-	}
-
 	Time = 0;
 	return 0;
 }
@@ -484,12 +285,6 @@ static int Draw_cpp(Context* context)
 
 		Matrix4x4 viewproj = Matrix4x4_Multiply(view, proj);
 
-		SDL_GPUColorTargetInfo colorTargetInfo = { 0 };
-		colorTargetInfo.texture = SceneColorTexture;
-		colorTargetInfo.clear_color = SDL_FColor{ 0.0f, 0.0f, 0.0f, 0.0f };
-		colorTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
-		colorTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
-
 		SDL_GPUDepthStencilTargetInfo depthStencilTargetInfo = { 0 };
 		depthStencilTargetInfo.texture = SceneDepthTexture;
 		depthStencilTargetInfo.cycle = true;
@@ -504,40 +299,13 @@ static int Draw_cpp(Context* context)
 		std::array<float, 2> nearFarPlane{nearPlane, farPlane};
 		SDL_PushGPUFragmentUniformData(cmdbuf, 0, nearFarPlane.data(), 8);
 
-#if !DISABLE_EFFECT
-		SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &colorTargetInfo, 1, &depthStencilTargetInfo);
-		SDL_GPUBufferBinding sceneVertexBufferBinding{.buffer = SceneVertexBuffer, .offset = 0 };
-		SDL_BindGPUVertexBuffers(renderPass, 0, &sceneVertexBufferBinding, 1);
-		SDL_GPUBufferBinding sceneIndexBufferBinding{ .buffer = SceneIndexBuffer, .offset = 0 };
-		SDL_BindGPUIndexBuffer(renderPass, &sceneIndexBufferBinding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
-		SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
-		SDL_DrawGPUIndexedPrimitives(renderPass, 36, 1, 0, 0, 0);
-		SDL_EndGPURenderPass(renderPass);
-#endif
-
-		// Render the Outline Effect that samples from the Color/Depth textures
+		// Render the object
 		SDL_GPUColorTargetInfo swapchainTargetInfo = { 0 };
 		swapchainTargetInfo.texture = swapchainTexture;
 		swapchainTargetInfo.clear_color = SDL_FColor{ 0.2f, 0.5f, 0.4f, 1.0f };
 		swapchainTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
 		swapchainTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
 
-#if !DISABLE_EFFECT
-		renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, nullptr);
-		SDL_BindGPUGraphicsPipeline(renderPass, EffectPipeline);
-		SDL_GPUBufferBinding effectVertexBufferBinding{.buffer = EffectVertexBuffer, .offset = 0 };
-		SDL_BindGPUVertexBuffers(renderPass, 0, &effectVertexBufferBinding, 1);
-		SDL_GPUBufferBinding effectIndexBufferBinding{ .buffer = EffectIndexBuffer, .offset = 0 };
-		SDL_BindGPUIndexBuffer(renderPass, &effectIndexBufferBinding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
-		std::array<SDL_GPUTextureSamplerBinding, 2> textureSamplerBindings{{
-			{ .texture = SceneColorTexture, .sampler = EffectSampler },
-			{ .texture = SceneDepthTexture, .sampler = EffectSampler }
-		}};
-		SDL_BindGPUFragmentSamplers(renderPass, 0, textureSamplerBindings.data(), 2);
-		SDL_DrawGPUIndexedPrimitives(renderPass, 6, 1, 0, 0, 0);
-		SDL_EndGPURenderPass(renderPass);
-
-#else
 		SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
 		SDL_GPUBufferBinding sceneVertexBufferBinding{.buffer = SceneVertexBuffer, .offset = 0 };
 		SDL_BindGPUVertexBuffers(renderPass, 0, &sceneVertexBufferBinding, 1);
@@ -546,8 +314,6 @@ static int Draw_cpp(Context* context)
 		SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
 		SDL_DrawGPUIndexedPrimitives(renderPass, 36, 1, 0, 0, 0);
 		SDL_EndGPURenderPass(renderPass);
-#endif
-
 	}
 
 	SDL_SubmitGPUCommandBuffer(cmdbuf);
@@ -558,15 +324,9 @@ static int Draw_cpp(Context* context)
 static void Quit_cpp(Context* context)
 {
 	SDL_ReleaseGPUGraphicsPipeline(context->Device, ScenePipeline);
-	SDL_ReleaseGPUTexture(context->Device, SceneColorTexture);
 	SDL_ReleaseGPUTexture(context->Device, SceneDepthTexture);
 	SDL_ReleaseGPUBuffer(context->Device, SceneVertexBuffer);
 	SDL_ReleaseGPUBuffer(context->Device, SceneIndexBuffer);
-
-	SDL_ReleaseGPUGraphicsPipeline(context->Device, EffectPipeline);
-	SDL_ReleaseGPUBuffer(context->Device, EffectVertexBuffer);
-	SDL_ReleaseGPUBuffer(context->Device, EffectIndexBuffer);
-	SDL_ReleaseGPUSampler(context->Device, EffectSampler);
 
 	CommonQuit(context);
 }
