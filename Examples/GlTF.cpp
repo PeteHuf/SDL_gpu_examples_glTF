@@ -10,8 +10,6 @@ extern "C" {
 #include "glTFModel.h"
 
 static SDL_GPUGraphicsPipeline* ScenePipeline;
-static SDL_GPUBuffer* SceneVertexBuffer;
-static SDL_GPUBuffer* SceneIndexBuffer;
 static SDL_GPUTexture* SceneDepthTexture;
 
 static float Time;
@@ -180,92 +178,6 @@ static int Init_cpp(Context* context)
 
 		const float longestSide = std::reduce(allSides.begin(), allSides.end(), 0.0f, [](float left, float right){ return std::max(left, right); });
 		WorldScale = 10.0f / longestSide;
-
-		SDL_GPUBufferCreateInfo sceneVertexBufferCreateInfo {
-			.usage = SDL_GPU_BUFFERUSAGE_VERTEX,
-			.size = static_cast<Uint32>(sizeof(GlmPositionColorVertex) * SmartContext->vertCount)
-		};
-		SceneVertexBuffer = SDL_CreateGPUBuffer(
-			context->Device,
-			&sceneVertexBufferCreateInfo
-		);
-
-		SDL_GPUBufferCreateInfo sceneIndexBufferCreateInfo {
-			.usage = SDL_GPU_BUFFERUSAGE_INDEX,
-			.size = static_cast<Uint32>(sizeof(SmartContext_t::IndexType) * SmartContext->indexCount)
-		};
-		SceneIndexBuffer = SDL_CreateGPUBuffer(
-			context->Device,
-			&sceneIndexBufferCreateInfo
-		);
-
-
-
-
-		SDL_GPUTransferBufferCreateInfo posColorTransferBufferCreateInfo {
-			.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-			.size = static_cast<Uint32>((sizeof(GlmPositionColorVertex) * SmartContext->vertCount)) + static_cast<Uint32>((sizeof(SmartContext_t::IndexType) * SmartContext->indexCount))
-		};
-		SDL_GPUTransferBuffer* bufferTransferBuffer = SDL_CreateGPUTransferBuffer(
-			context->Device,
-			&posColorTransferBufferCreateInfo
-		);
-
-		GlmPositionColorVertex* transferData = static_cast<GlmPositionColorVertex*>(SDL_MapGPUTransferBuffer(
-			context->Device,
-			bufferTransferBuffer,
-			false
-		));
-
-		SDL_memcpy(transferData, SmartContext->model->vertexBufferHackyStorage.data(), sizeof(decltype(SmartContext->model->vertexBufferHackyStorage)::value_type) * static_cast<Uint32>(SmartContext->vertCount));
-
-		SmartContext_t::IndexType* indexData = (SmartContext_t::IndexType*) &transferData[SmartContext->vertCount];
-		SDL_memcpy(indexData, SmartContext->model->indexBufferHackyStorage.data(), sizeof(decltype(SmartContext->model->indexBufferHackyStorage)::value_type) * SmartContext->indexCount);
-
-		SDL_UnmapGPUTransferBuffer(context->Device, bufferTransferBuffer);
-
-
-
-
-		// Upload the transfer data to the GPU buffers
-		SDL_GPUCommandBuffer* uploadCmdBuf = SDL_AcquireGPUCommandBuffer(context->Device);
-		SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(uploadCmdBuf);
-
-		SDL_GPUTransferBufferLocation vertexTransferBufferLocation{
-			.transfer_buffer = bufferTransferBuffer,
-			.offset = 0
-		};
-		SDL_GPUBufferRegion vertexBufferRegion{
-			.buffer = SceneVertexBuffer,
-			.offset = 0,
-			.size = static_cast<Uint32>(sizeof(GlmPositionColorVertex) * SmartContext->vertCount)
-		};
-		SDL_UploadToGPUBuffer(
-			copyPass,
-			&vertexTransferBufferLocation,
-			&vertexBufferRegion,
-			false
-		);
-
-		SDL_GPUTransferBufferLocation indexTransferBufferLocation{
-			.transfer_buffer = bufferTransferBuffer,
-			.offset = static_cast<Uint32>(sizeof(GlmPositionColorVertex) * SmartContext->vertCount)
-		};
-		SDL_GPUBufferRegion indexBufferRegion{
-			.buffer = SceneIndexBuffer,
-			.offset = 0,
-			.size = static_cast<Uint32>(sizeof(SmartContext_t::IndexType) * SmartContext->indexCount)
-		};
-		SDL_UploadToGPUBuffer(
-			copyPass,
-			&indexTransferBufferLocation,
-			&indexBufferRegion,
-			false
-		);
-
-		SDL_EndGPUCopyPass(copyPass);
-		SDL_SubmitGPUCommandBuffer(uploadCmdBuf);
-		SDL_ReleaseGPUTransferBuffer(context->Device, bufferTransferBuffer);
 	}
 
 	Time = 0;
@@ -342,29 +254,21 @@ static int Draw_cpp(Context* context)
 
 
 
-		//SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
-
-		//SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
-		//SmartContext->model->draw(renderPass);
-
-		////SDL_GPUBufferBinding sceneVertexBufferBinding{.buffer = SmartContext->model->vertices.buffer, .offset = 0 };
-		////SDL_BindGPUVertexBuffers(renderPass, 0, &sceneVertexBufferBinding, 1);
-		////SDL_GPUBufferBinding sceneIndexBufferBinding{ .buffer = SmartContext->model->indices.buffer, .offset = 0 };
-		////SDL_BindGPUIndexBuffer(renderPass, &sceneIndexBufferBinding, SDL_GPU_INDEXELEMENTSIZE_32BIT);
-		////SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
-		////SDL_DrawGPUIndexedPrimitives(renderPass, SmartContext->indexCount, 1, 0, 0, 0);
-		//SDL_EndGPURenderPass(renderPass);
 
 
+		SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
 
-		 SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
-		 SDL_GPUBufferBinding sceneVertexBufferBinding{.buffer = SceneVertexBuffer, .offset = 0 };
-		 SDL_BindGPUVertexBuffers(renderPass, 0, &sceneVertexBufferBinding, 1);
-		 SDL_GPUBufferBinding sceneIndexBufferBinding{ .buffer = SceneIndexBuffer, .offset = 0 };
-		 SDL_BindGPUIndexBuffer(renderPass, &sceneIndexBufferBinding, SmartContext_t::index_element_size);
-		 SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
-		 SDL_DrawGPUIndexedPrimitives(renderPass, SmartContext->indexCount, 1, 0, 0, 0);
-		 SDL_EndGPURenderPass(renderPass);
+
+		SDL_GPUBufferBinding buffBinding{ .buffer = SmartContext->model->vertices.buffer, .offset = 0 };
+		SDL_GPUBufferBinding indBinding{ .buffer = SmartContext->model->indices.buffer, .offset = 0 };
+
+		SDL_BindGPUVertexBuffers(renderPass, 0, &buffBinding, 1);
+		SDL_BindGPUIndexBuffer(renderPass, &indBinding, SDL_GPU_INDEXELEMENTSIZE_32BIT);
+
+
+		SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
+		SDL_DrawGPUIndexedPrimitives(renderPass, SmartContext->indexCount, 1, 0, 0, 0);
+		SDL_EndGPURenderPass(renderPass);
 	}
 
 	SDL_SubmitGPUCommandBuffer(cmdbuf);
@@ -379,8 +283,6 @@ static void Quit_cpp(Context* context)
 
 	SDL_ReleaseGPUGraphicsPipeline(context->Device, ScenePipeline);
 	SDL_ReleaseGPUTexture(context->Device, SceneDepthTexture);
-	SDL_ReleaseGPUBuffer(context->Device, SceneVertexBuffer);
-	SDL_ReleaseGPUBuffer(context->Device, SceneIndexBuffer);
 
 	CommonQuit(context);
 }
