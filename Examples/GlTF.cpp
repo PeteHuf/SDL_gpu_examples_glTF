@@ -28,7 +28,9 @@ struct SmartContext_t {
 	std::unique_ptr<vks::VulkanDevice> vulkanDevice{};
 	std::unique_ptr<vkglTF::Model> model{};
 
-	std::vector<Uint16> indexInput{};
+	using IndexType = Uint32;
+	static constexpr SDL_GPUIndexElementSize index_element_size = SDL_GPU_INDEXELEMENTSIZE_32BIT;
+
 
 	Uint32 vertCount{};
 	Uint32 indexCount{};
@@ -158,14 +160,7 @@ static int Init_cpp(Context* context)
 
 
 		SmartContext->vertCount = static_cast<Uint32>(SmartContext->model->vertexBufferHackyStorage.size());
-
-
-
-		SmartContext->indexInput.clear();
-		for (uint32_t index : SmartContext->model->indexBufferHackyStorage) {
-			SmartContext->indexInput.emplace_back(static_cast<Uint16>(index));
-		}
-
+		SmartContext->indexCount = static_cast<Uint32>(SmartContext->model->indexBufferHackyStorage.size());
 
 
 		SmartContext->aabb = vkglTF::BoundingBox(glm::vec3(-1), glm::vec3(1));
@@ -197,7 +192,7 @@ static int Init_cpp(Context* context)
 
 		SDL_GPUBufferCreateInfo sceneIndexBufferCreateInfo {
 			.usage = SDL_GPU_BUFFERUSAGE_INDEX,
-			.size = static_cast<Uint32>(sizeof(Uint16) * SmartContext->indexInput.size())
+			.size = static_cast<Uint32>(sizeof(SmartContext_t::IndexType) * SmartContext->indexCount)
 		};
 		SceneIndexBuffer = SDL_CreateGPUBuffer(
 			context->Device,
@@ -209,7 +204,7 @@ static int Init_cpp(Context* context)
 
 		SDL_GPUTransferBufferCreateInfo posColorTransferBufferCreateInfo {
 			.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-			.size = static_cast<Uint32>((sizeof(GlmPositionColorVertex) * SmartContext->vertCount)) + static_cast<Uint32>((sizeof(Uint16) * SmartContext->indexInput.size()))
+			.size = static_cast<Uint32>((sizeof(GlmPositionColorVertex) * SmartContext->vertCount)) + static_cast<Uint32>((sizeof(SmartContext_t::IndexType) * SmartContext->indexCount))
 		};
 		SDL_GPUTransferBuffer* bufferTransferBuffer = SDL_CreateGPUTransferBuffer(
 			context->Device,
@@ -224,8 +219,8 @@ static int Init_cpp(Context* context)
 
 		SDL_memcpy(transferData, SmartContext->model->vertexBufferHackyStorage.data(), sizeof(decltype(SmartContext->model->vertexBufferHackyStorage)::value_type) * static_cast<Uint32>(SmartContext->vertCount));
 
-		Uint16* indexData = (Uint16*) &transferData[SmartContext->vertCount];
-		SDL_memcpy(indexData, SmartContext->indexInput.data(), sizeof(decltype(SmartContext->indexInput)::value_type) * static_cast<Uint32>(SmartContext->indexInput.size()));
+		SmartContext_t::IndexType* indexData = (SmartContext_t::IndexType*) &transferData[SmartContext->vertCount];
+		SDL_memcpy(indexData, SmartContext->model->indexBufferHackyStorage.data(), sizeof(decltype(SmartContext->model->indexBufferHackyStorage)::value_type) * SmartContext->indexCount);
 
 		SDL_UnmapGPUTransferBuffer(context->Device, bufferTransferBuffer);
 
@@ -259,7 +254,7 @@ static int Init_cpp(Context* context)
 		SDL_GPUBufferRegion indexBufferRegion{
 			.buffer = SceneIndexBuffer,
 			.offset = 0,
-			.size = static_cast<Uint32>(sizeof(Uint16) * SmartContext->indexInput.size())
+			.size = static_cast<Uint32>(sizeof(SmartContext_t::IndexType) * SmartContext->indexCount)
 		};
 		SDL_UploadToGPUBuffer(
 			copyPass,
@@ -357,7 +352,7 @@ static int Draw_cpp(Context* context)
 		////SDL_GPUBufferBinding sceneIndexBufferBinding{ .buffer = SmartContext->model->indices.buffer, .offset = 0 };
 		////SDL_BindGPUIndexBuffer(renderPass, &sceneIndexBufferBinding, SDL_GPU_INDEXELEMENTSIZE_32BIT);
 		////SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
-		////SDL_DrawGPUIndexedPrimitives(renderPass, SmartContext->indexInput.size(), 1, 0, 0, 0);
+		////SDL_DrawGPUIndexedPrimitives(renderPass, SmartContext->indexCount, 1, 0, 0, 0);
 		//SDL_EndGPURenderPass(renderPass);
 
 
@@ -366,9 +361,9 @@ static int Draw_cpp(Context* context)
 		 SDL_GPUBufferBinding sceneVertexBufferBinding{.buffer = SceneVertexBuffer, .offset = 0 };
 		 SDL_BindGPUVertexBuffers(renderPass, 0, &sceneVertexBufferBinding, 1);
 		 SDL_GPUBufferBinding sceneIndexBufferBinding{ .buffer = SceneIndexBuffer, .offset = 0 };
-		 SDL_BindGPUIndexBuffer(renderPass, &sceneIndexBufferBinding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
+		 SDL_BindGPUIndexBuffer(renderPass, &sceneIndexBufferBinding, SmartContext_t::index_element_size);
 		 SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
-		 SDL_DrawGPUIndexedPrimitives(renderPass, static_cast<Uint32>(SmartContext->indexInput.size()), 1, 0, 0, 0);
+		 SDL_DrawGPUIndexedPrimitives(renderPass, SmartContext->indexCount, 1, 0, 0, 0);
 		 SDL_EndGPURenderPass(renderPass);
 	}
 
