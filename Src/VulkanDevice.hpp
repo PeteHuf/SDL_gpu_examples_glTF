@@ -43,6 +43,12 @@ namespace vks
 
 		// operator SDL_GPUDevice*() { return logicalDevice; };
 
+		VulkanDevice(SDL_GPUDevice* device, SDL_Window* window)
+		{
+			this->logicalDevice = device;
+			this->window = window;
+		}
+
 		/**
 		* Default constructor
 		*
@@ -103,15 +109,15 @@ namespace vks
 		*/
 		~VulkanDevice()
 		{
-			SDL_WaitForGPUIdle(logicalDevice);
-
-			// if (commandPool) {
-			// 	vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
+			// SDL_WaitForGPUIdle(logicalDevice);
+			//
+			// // if (commandPool) {
+			// // 	vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
+			// // }
+			// if (logicalDevice) {
+			// 	SDL_ReleaseWindowFromGPUDevice(logicalDevice, window);
+			// 	SDL_DestroyGPUDevice(logicalDevice);
 			// }
-			if (logicalDevice) {
-				SDL_ReleaseWindowFromGPUDevice(logicalDevice, window);
-				SDL_DestroyGPUDevice(logicalDevice);
-			}
 		}
 
 		// /**

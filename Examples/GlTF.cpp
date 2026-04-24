@@ -1,10 +1,13 @@
 #include <array>
+#include <numeric>
 
 extern "C" {
 
 #include "Common.h"
 
 } // extern "C"
+
+#include "glTFModel.h"
 
 static SDL_GPUGraphicsPipeline* ScenePipeline;
 static SDL_GPUBuffer* SceneVertexBuffer;
@@ -13,6 +16,27 @@ static SDL_GPUTexture* SceneDepthTexture;
 
 static float Time;
 static int SceneWidth, SceneHeight;
+static float WorldScale = 1.0f;
+
+typedef struct GlmPositionColorVertex
+{
+	glm::vec3 pos;
+	glm::vec4 color;
+} GlmPositionColorVertex;
+
+struct SmartContext_t {
+	std::unique_ptr<vks::VulkanDevice> vulkanDevice{};
+	std::unique_ptr<vkglTF::Model> model{};
+
+	std::vector<Uint16> indexInput{};
+
+	Uint32 vertCount{};
+	Uint32 indexCount{};
+
+	vkglTF::BoundingBox aabb{};
+};
+
+static SmartContext_t* SmartContext = nullptr;
 
 static int Init_cpp(Context* context)
 {
@@ -40,7 +64,7 @@ static int Init_cpp(Context* context)
 
 		std::array<SDL_GPUVertexBufferDescription, 1> sceneVertexBufferDescription{{{
 			.slot = 0,
-			.pitch = sizeof(PositionColorVertex),
+			.pitch = sizeof(GlmPositionColorVertex),
 			.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
 			.instance_step_rate = 0
 		}}};
@@ -52,7 +76,7 @@ static int Init_cpp(Context* context)
 		}, {
 			.location = 1,
 			.buffer_slot = 0,
-			.format = SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM,
+			.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4,
 			.offset = sizeof(float) * 3
 		}}};
 		std::array<SDL_GPUColorTargetDescription, 1> sceneColorTargetDescription{{{
@@ -121,11 +145,50 @@ static int Init_cpp(Context* context)
 		);
 	}
 
-	// Create & Upload Scene Index and Vertex Buffers
+	SmartContext = new SmartContext_t{};
+
 	{
+
+		SmartContext->vulkanDevice = std::make_unique<vks::VulkanDevice>(context->Device, context->Window);
+		SmartContext->model = std::make_unique<vkglTF::Model>();
+		SmartContext->model->loadFromFile("Content/Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
+		//SmartContext->model->loadFromFile("Content/Models/Box/glTF-Embedded/Box.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
+		//SmartContext->model->loadFromFile("Content/Models/green_cube/glTF/green_cube.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
+
+
+
+		SmartContext->vertCount = static_cast<Uint32>(SmartContext->model->vertexBufferHackyStorage.size());
+
+
+
+		SmartContext->indexInput.clear();
+		for (uint32_t index : SmartContext->model->indexBufferHackyStorage) {
+			SmartContext->indexInput.emplace_back(static_cast<Uint16>(index));
+		}
+
+
+
+		SmartContext->aabb = vkglTF::BoundingBox(glm::vec3(-1), glm::vec3(1));
+
+
+
+
+
+		const std::array<float, 6> allSides{
+			std::abs(SmartContext->aabb.min.x),
+			std::abs(SmartContext->aabb.min.y),
+			std::abs(SmartContext->aabb.min.z),
+			std::abs(SmartContext->aabb.max.x),
+			std::abs(SmartContext->aabb.max.y),
+			std::abs(SmartContext->aabb.max.z),
+		};
+
+		const float longestSide = std::reduce(allSides.begin(), allSides.end(), 0.0f, [](float left, float right){ return std::max(left, right); });
+		WorldScale = 10.0f / longestSide;
+
 		SDL_GPUBufferCreateInfo sceneVertexBufferCreateInfo {
 			.usage = SDL_GPU_BUFFERUSAGE_VERTEX,
-			.size = sizeof(PositionColorVertex) * 24
+			.size = static_cast<Uint32>(sizeof(GlmPositionColorVertex) * SmartContext->vertCount)
 		};
 		SceneVertexBuffer = SDL_CreateGPUBuffer(
 			context->Device,
@@ -134,70 +197,40 @@ static int Init_cpp(Context* context)
 
 		SDL_GPUBufferCreateInfo sceneIndexBufferCreateInfo {
 			.usage = SDL_GPU_BUFFERUSAGE_INDEX,
-			.size = sizeof(Uint16) * 36
+			.size = static_cast<Uint32>(sizeof(Uint16) * SmartContext->indexInput.size())
 		};
 		SceneIndexBuffer = SDL_CreateGPUBuffer(
 			context->Device,
 			&sceneIndexBufferCreateInfo
 		);
 
+
+
+
 		SDL_GPUTransferBufferCreateInfo posColorTransferBufferCreateInfo {
 			.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-			.size = (sizeof(PositionColorVertex) * 24) + (sizeof(Uint16) * 36)
+			.size = static_cast<Uint32>((sizeof(GlmPositionColorVertex) * SmartContext->vertCount)) + static_cast<Uint32>((sizeof(Uint16) * SmartContext->indexInput.size()))
 		};
 		SDL_GPUTransferBuffer* bufferTransferBuffer = SDL_CreateGPUTransferBuffer(
 			context->Device,
 			&posColorTransferBufferCreateInfo
 		);
 
-		PositionColorVertex* transferData = static_cast<PositionColorVertex*>(SDL_MapGPUTransferBuffer(
+		GlmPositionColorVertex* transferData = static_cast<GlmPositionColorVertex*>(SDL_MapGPUTransferBuffer(
 			context->Device,
 			bufferTransferBuffer,
 			false
 		));
 
-		transferData[0] = PositionColorVertex { -10, -10, -10, 255, 0, 0, 255 };
-		transferData[1] = PositionColorVertex { 10, -10, -10, 255, 0, 0, 255 };
-		transferData[2] = PositionColorVertex { 10, 10, -10, 255, 0, 0, 255 };
-		transferData[3] = PositionColorVertex { -10, 10, -10, 255, 0, 0, 255 };
+		SDL_memcpy(transferData, SmartContext->model->vertexBufferHackyStorage.data(), sizeof(decltype(SmartContext->model->vertexBufferHackyStorage)::value_type) * static_cast<Uint32>(SmartContext->vertCount));
 
-		transferData[4] = PositionColorVertex { -10, -10, 10, 255, 255, 0, 255 };
-		transferData[5] = PositionColorVertex { 10, -10, 10, 255, 255, 0, 255 };
-		transferData[6] = PositionColorVertex { 10, 10, 10, 255, 255, 0, 255 };
-		transferData[7] = PositionColorVertex { -10, 10, 10, 255, 255, 0, 255 };
-
-		transferData[8] = PositionColorVertex { -10, -10, -10, 255, 0, 255, 255 };
-		transferData[9] = PositionColorVertex { -10, 10, -10, 255, 0, 255, 255 };
-		transferData[10] = PositionColorVertex { -10, 10, 10, 255, 0, 255, 255 };
-		transferData[11] = PositionColorVertex { -10, -10, 10, 255, 0, 255, 255 };
-
-		transferData[12] = PositionColorVertex { 10, -10, -10, 0, 255, 0, 255 };
-		transferData[13] = PositionColorVertex { 10, 10, -10, 0, 255, 0, 255 };
-		transferData[14] = PositionColorVertex { 10, 10, 10, 0, 255, 0, 255 };
-		transferData[15] = PositionColorVertex { 10, -10, 10, 0, 255, 0, 255 };
-
-		transferData[16] = PositionColorVertex { -10, -10, -10, 0, 255, 255, 255 };
-		transferData[17] = PositionColorVertex { -10, -10, 10, 0, 255, 255, 255 };
-		transferData[18] = PositionColorVertex { 10, -10, 10, 0, 255, 255, 255 };
-		transferData[19] = PositionColorVertex { 10, -10, -10, 0, 255, 255, 255 };
-
-		transferData[20] = PositionColorVertex { -10, 10, -10, 0, 0, 255, 255 };
-		transferData[21] = PositionColorVertex { -10, 10, 10, 0, 0, 255, 255 };
-		transferData[22] = PositionColorVertex { 10, 10, 10, 0, 0, 255, 255 };
-		transferData[23] = PositionColorVertex { 10, 10, -10, 0, 0, 255, 255 };
-
-		Uint16* indexData = (Uint16*) &transferData[24];
-		Uint16 indices[] = {
-			0, 1, 2, 0, 2, 3,
-			4, 5, 6, 4, 6, 7,
-			8, 9, 10, 8, 10, 11,
-			12, 13, 14, 12, 14, 15,
-			16, 17, 18, 16, 18, 19,
-			20, 21, 22, 20, 22, 23
-		};
-		SDL_memcpy(indexData, indices, sizeof(indices));
+		Uint16* indexData = (Uint16*) &transferData[SmartContext->vertCount];
+		SDL_memcpy(indexData, SmartContext->indexInput.data(), sizeof(decltype(SmartContext->indexInput)::value_type) * static_cast<Uint32>(SmartContext->indexInput.size()));
 
 		SDL_UnmapGPUTransferBuffer(context->Device, bufferTransferBuffer);
+
+
+
 
 		// Upload the transfer data to the GPU buffers
 		SDL_GPUCommandBuffer* uploadCmdBuf = SDL_AcquireGPUCommandBuffer(context->Device);
@@ -210,7 +243,7 @@ static int Init_cpp(Context* context)
 		SDL_GPUBufferRegion vertexBufferRegion{
 			.buffer = SceneVertexBuffer,
 			.offset = 0,
-			.size = sizeof(PositionColorVertex) * 24
+			.size = static_cast<Uint32>(sizeof(GlmPositionColorVertex) * SmartContext->vertCount)
 		};
 		SDL_UploadToGPUBuffer(
 			copyPass,
@@ -221,13 +254,13 @@ static int Init_cpp(Context* context)
 
 		SDL_GPUTransferBufferLocation indexTransferBufferLocation{
 			.transfer_buffer = bufferTransferBuffer,
-			.offset = sizeof(PositionColorVertex) * 24
-	};
+			.offset = static_cast<Uint32>(sizeof(GlmPositionColorVertex) * SmartContext->vertCount)
+		};
 		SDL_GPUBufferRegion indexBufferRegion{
 			.buffer = SceneIndexBuffer,
 			.offset = 0,
-			.size = sizeof(Uint16) * 36
-	};
+			.size = static_cast<Uint32>(sizeof(Uint16) * SmartContext->indexInput.size())
+		};
 		SDL_UploadToGPUBuffer(
 			copyPass,
 			&indexTransferBufferLocation,
@@ -271,6 +304,11 @@ static int Draw_cpp(Context* context)
 		float nearPlane = 20.0f;
 		float farPlane = 60.0f;
 
+		Matrix4x4 world = Matrix4x4_CreateScale( // PRECHECKIN: cleanup
+			WorldScale,
+			WorldScale,
+			WorldScale
+		);
 		Matrix4x4 proj = Matrix4x4_CreatePerspectiveFieldOfView(
 			75.0f * SDL_PI_F / 180.0f,
 			SceneWidth / (float)SceneHeight,
@@ -283,7 +321,8 @@ static int Draw_cpp(Context* context)
 			Vector3{ 0, 1, 0 }
 		);
 
-		Matrix4x4 viewproj = Matrix4x4_Multiply(view, proj);
+		//Matrix4x4 viewproj = Matrix4x4_Multiply(view, proj); // PRECHECKIN: cleanup
+		Matrix4x4 viewproj = Matrix4x4_Multiply(Matrix4x4_Multiply(world, view), proj);
 
 		SDL_GPUDepthStencilTargetInfo depthStencilTargetInfo = { 0 };
 		depthStencilTargetInfo.texture = SceneDepthTexture;
@@ -306,14 +345,31 @@ static int Draw_cpp(Context* context)
 		swapchainTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
 		swapchainTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
 
-		SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
-		SDL_GPUBufferBinding sceneVertexBufferBinding{.buffer = SceneVertexBuffer, .offset = 0 };
-		SDL_BindGPUVertexBuffers(renderPass, 0, &sceneVertexBufferBinding, 1);
-		SDL_GPUBufferBinding sceneIndexBufferBinding{ .buffer = SceneIndexBuffer, .offset = 0 };
-		SDL_BindGPUIndexBuffer(renderPass, &sceneIndexBufferBinding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
-		SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
-		SDL_DrawGPUIndexedPrimitives(renderPass, 36, 1, 0, 0, 0);
-		SDL_EndGPURenderPass(renderPass);
+
+
+		//SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
+
+		//SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
+		//SmartContext->model->draw(renderPass);
+
+		////SDL_GPUBufferBinding sceneVertexBufferBinding{.buffer = SmartContext->model->vertices.buffer, .offset = 0 };
+		////SDL_BindGPUVertexBuffers(renderPass, 0, &sceneVertexBufferBinding, 1);
+		////SDL_GPUBufferBinding sceneIndexBufferBinding{ .buffer = SmartContext->model->indices.buffer, .offset = 0 };
+		////SDL_BindGPUIndexBuffer(renderPass, &sceneIndexBufferBinding, SDL_GPU_INDEXELEMENTSIZE_32BIT);
+		////SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
+		////SDL_DrawGPUIndexedPrimitives(renderPass, SmartContext->indexInput.size(), 1, 0, 0, 0);
+		//SDL_EndGPURenderPass(renderPass);
+
+
+
+		 SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
+		 SDL_GPUBufferBinding sceneVertexBufferBinding{.buffer = SceneVertexBuffer, .offset = 0 };
+		 SDL_BindGPUVertexBuffers(renderPass, 0, &sceneVertexBufferBinding, 1);
+		 SDL_GPUBufferBinding sceneIndexBufferBinding{ .buffer = SceneIndexBuffer, .offset = 0 };
+		 SDL_BindGPUIndexBuffer(renderPass, &sceneIndexBufferBinding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
+		 SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
+		 SDL_DrawGPUIndexedPrimitives(renderPass, static_cast<Uint32>(SmartContext->indexInput.size()), 1, 0, 0, 0);
+		 SDL_EndGPURenderPass(renderPass);
 	}
 
 	SDL_SubmitGPUCommandBuffer(cmdbuf);
@@ -323,6 +379,9 @@ static int Draw_cpp(Context* context)
 
 static void Quit_cpp(Context* context)
 {
+	delete SmartContext;
+	SmartContext = nullptr;
+
 	SDL_ReleaseGPUGraphicsPipeline(context->Device, ScenePipeline);
 	SDL_ReleaseGPUTexture(context->Device, SceneDepthTexture);
 	SDL_ReleaseGPUBuffer(context->Device, SceneVertexBuffer);

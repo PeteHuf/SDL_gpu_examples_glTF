@@ -73,6 +73,7 @@ typedef struct Vector3
 
 Matrix4x4 Matrix4x4_Multiply(Matrix4x4 matrix1, Matrix4x4 matrix2);
 Matrix4x4 Matrix4x4_CreateRotationZ(float radians);
+Matrix4x4 Matrix4x4_CreateScale(float x, float y, float z);
 Matrix4x4 Matrix4x4_CreateTranslation(float x, float y, float z);
 Matrix4x4 Matrix4x4_CreateOrthographicOffCenter(float left, float right, float bottom, float top, float zNearPlane, float zFarPlane);
 Matrix4x4 Matrix4x4_CreatePerspectiveFieldOfView(float fieldOfView, float aspectRatio, float nearPlaneDistance, float farPlaneDistance);

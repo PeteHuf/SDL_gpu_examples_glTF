@@ -891,38 +891,46 @@ namespace vkglTF
 					for (size_t v = 0; v < posAccessor.count; v++) {
 						Vertex& vert = loaderInfo.vertexBuffer[loaderInfo.vertexPos];
 						vert.pos = glm::vec4(glm::make_vec3(&bufferPos[v * posByteStride]), 1.0f);
-						vert.normal = glm::normalize(glm::vec3(bufferNormals ? glm::make_vec3(&bufferNormals[v * normByteStride]) : glm::vec3(0.0f)));
-						vert.uv0 = bufferTexCoordSet0 ? glm::make_vec2(&bufferTexCoordSet0[v * uv0ByteStride]) : glm::vec3(0.0f);
-						vert.uv1 = bufferTexCoordSet1 ? glm::make_vec2(&bufferTexCoordSet1[v * uv1ByteStride]) : glm::vec3(0.0f);
-						vert.color = bufferColorSet0 ? glm::make_vec4(&bufferColorSet0[v * color0ByteStride]) : glm::vec4(1.0f);
+						// vert.normal = glm::normalize(glm::vec3(bufferNormals ? glm::make_vec3(&bufferNormals[v * normByteStride]) : glm::vec3(0.0f)));
+						// vert.uv0 = bufferTexCoordSet0 ? glm::make_vec2(&bufferTexCoordSet0[v * uv0ByteStride]) : glm::vec3(0.0f);
+						// vert.uv1 = bufferTexCoordSet1 ? glm::make_vec2(&bufferTexCoordSet1[v * uv1ByteStride]) : glm::vec3(0.0f); // PRECHECKIN: bring back
 
-						if (hasSkin)
-						{
-							switch (jointComponentType) {
-							case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: {
-								const uint16_t *buf = static_cast<const uint16_t*>(bufferJoints);
-								vert.joint0 = glm::uvec4(glm::make_vec4(&buf[v * jointByteStride]));
-								break;
-							}
-							case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE: {
-								const uint8_t *buf = static_cast<const uint8_t*>(bufferJoints);
-								vert.joint0 = glm::vec4(glm::make_vec4(&buf[v * jointByteStride]));
-								break;
-							}
-							default:
-								// Not supported by spec
-								std::cerr << "Joint component type " << jointComponentType << " not supported!" << std::endl;
-								break;
-							}
-						}
-						else {
-							vert.joint0 = glm::vec4(0.0f);
-						}
-						vert.weight0 = hasSkin ? glm::make_vec4(&bufferWeights[v * weightByteStride]) : glm::vec4(0.0f);
-						// Fix for all zero weights
-						if (glm::length(vert.weight0) == 0.0f) {
-							vert.weight0 = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-						}
+						//vert.color = bufferColorSet0 ? glm::make_vec4(&bufferColorSet0[v * color0ByteStride]) : glm::vec4(1.0f);
+						vert.color = bufferColorSet0 ? glm::make_vec4(&bufferColorSet0[v * color0ByteStride]) : // PRECHECKIN: putback
+							glm::vec4(
+								(vert.pos.x + 1.0f) / 2,
+								(vert.pos.y + 1.0f) / 2,
+								(vert.pos.z + 1.0f) / 2,
+								1.0f);
+
+
+						// if (hasSkin)
+						// {
+						// 	switch (jointComponentType) {
+						// 	case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: {
+						// 		const uint16_t *buf = static_cast<const uint16_t*>(bufferJoints);
+						// 		vert.joint0 = glm::uvec4(glm::make_vec4(&buf[v * jointByteStride])); // PRECHECKIN: bring back
+						// 		break;
+						// 	}
+						// 	case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE: {
+						// 		const uint8_t *buf = static_cast<const uint8_t*>(bufferJoints);
+						// 		vert.joint0 = glm::vec4(glm::make_vec4(&buf[v * jointByteStride]));
+						// 		break;
+						// 	}
+						// 	default:
+						// 		// Not supported by spec
+						// 		std::cerr << "Joint component type " << jointComponentType << " not supported!" << std::endl;
+						// 		break;
+						// 	}
+						// }
+						// else {
+						// 	vert.joint0 = glm::vec4(0.0f);
+						// }
+						// vert.weight0 = hasSkin ? glm::make_vec4(&bufferWeights[v * weightByteStride]) : glm::vec4(0.0f);
+						// // Fix for all zero weights
+						// if (glm::length(vert.weight0) == 0.0f) {
+						// 	vert.weight0 = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+						// }
 						loaderInfo.vertexPos++;
 					}
 				}
@@ -1537,6 +1545,14 @@ namespace vkglTF
 			// vkDestroyBuffer(device->logicalDevice, indexStaging.buffer, nullptr);
 			// vkFreeMemory(device->logicalDevice, indexStaging.memory, nullptr);
 			SDL_ReleaseGPUTransferBuffer(device->logicalDevice, indexStaging.buffer);
+		}
+
+		for (int i = 0; i < loaderInfo.vertexPos; ++i) {
+			vertexBufferHackyStorage.emplace_back(loaderInfo.vertexBuffer[i]);
+		}
+
+		for (int i = 0; i < loaderInfo.indexPos; ++i) {
+			indexBufferHackyStorage.emplace_back(loaderInfo.indexBuffer[i]);
 		}
 
 		delete[] loaderInfo.vertexBuffer;

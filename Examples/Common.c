@@ -4,7 +4,8 @@
 #define STBI_MALLOC SDL_malloc
 #define STBI_REALLOC SDL_realloc
 #define STBI_FREE SDL_free
-#define STBI_ONLY_HDR
+// petehuf: want to load jpeg etc
+//#define STBI_ONLY_HDR
 #include "../stb_image.h"
 
 int CommonInit(Context* context, SDL_WindowFlags windowFlags)
@@ -452,6 +453,16 @@ Matrix4x4 Matrix4x4_CreateRotationZ(float radians)
 		-SDL_sinf(radians), SDL_cosf(radians), 0, 0,
 						 0, 				0, 1, 0,
 						 0,					0, 0, 1
+	};
+}
+
+Matrix4x4 Matrix4x4_CreateScale(float x, float y, float z)
+{
+	return (Matrix4x4) {
+		x, 0, 0, 0,
+		0, y, 0, 0,
+		0, 0, z, 0,
+		0, 0, 0, 1
 	};
 }
 

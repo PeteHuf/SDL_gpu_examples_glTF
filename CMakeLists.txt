@@ -69,6 +69,11 @@ target_link_libraries(SDL_gpu_examples
     SDL3::SDL3
 )
 
+target_include_directories(SDL_gpu_examples
+    PRIVATE
+    Src
+)
+
 add_custom_command(TARGET SDL_gpu_examples POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content $<TARGET_FILE_DIR:SDL_gpu_examples>/Content
 )
