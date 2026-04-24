@@ -257,17 +257,10 @@ static int Draw_cpp(Context* context)
 
 
 		SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
-
-
-		SDL_GPUBufferBinding buffBinding{ .buffer = SmartContext->model->vertices.buffer, .offset = 0 };
-		SDL_GPUBufferBinding indBinding{ .buffer = SmartContext->model->indices.buffer, .offset = 0 };
-
-		SDL_BindGPUVertexBuffers(renderPass, 0, &buffBinding, 1);
-		SDL_BindGPUIndexBuffer(renderPass, &indBinding, SDL_GPU_INDEXELEMENTSIZE_32BIT);
-
-
 		SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
-		SDL_DrawGPUIndexedPrimitives(renderPass, SmartContext->indexCount, 1, 0, 0, 0);
+
+		SmartContext->model->draw(renderPass);
+
 		SDL_EndGPURenderPass(renderPass);
 	}
 
