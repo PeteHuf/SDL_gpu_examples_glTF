@@ -48,19 +48,39 @@ static int Init_cpp(Context* context)
 
 	// Creates the Shaders & Pipelines
 	{
-		SDL_GPUShader* sceneVertexShader = LoadShader(context->Device, "PositionColorTransform.vert", 0, 1, 0, 0);
-		if (sceneVertexShader == nullptr)
+		//SDL_GPUShader* sceneVertexShader = LoadShader(context->Device, "PositionColorTransform.vert", 0, 1, 0, 0);
+		//if (sceneVertexShader == nullptr)
+		//{
+		//	SDL_Log("Failed to create 'PositionColorTransform' vertex shader!");
+		//	return -1;
+		//}
+
+		//SDL_GPUShader* sceneFragmentShader = LoadShader(context->Device, "SolidColorDepth.frag", 0, 1, 0, 0);
+		//if (sceneFragmentShader == nullptr)
+		//{
+		//	SDL_Log("Failed to create 'SolidColorDepth' fragment shader!");
+		//	return -1;
+		//}
+
+
+
+		// Create the shaders
+		SDL_GPUShader* sceneVertexShader = LoadShader(context->Device, "TexturedQuad.vert", 0, 0, 0, 0); // PRECHECKIN: needs a new shader, but the texture is loading
+		if (sceneVertexShader == NULL)
 		{
-			SDL_Log("Failed to create 'PositionColorTransform' vertex shader!");
+			SDL_Log("Failed to create vertex shader!");
 			return -1;
 		}
 
-		SDL_GPUShader* sceneFragmentShader = LoadShader(context->Device, "SolidColorDepth.frag", 0, 1, 0, 0);
-		if (sceneFragmentShader == nullptr)
+		SDL_GPUShader* sceneFragmentShader = LoadShader(context->Device, "TexturedQuad.frag", 1, 0, 0, 0);
+		if (sceneFragmentShader == NULL)
 		{
-			SDL_Log("Failed to create 'SolidColorDepth' fragment shader!");
+			SDL_Log("Failed to create fragment shader!");
 			return -1;
 		}
+
+
+
 
 		std::array<SDL_GPUVertexBufferDescription, 1> sceneVertexBufferDescription{{{
 			.slot = 0,
@@ -68,17 +88,26 @@ static int Init_cpp(Context* context)
 			.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
 			.instance_step_rate = 0
 		}}};
-		std::array<SDL_GPUVertexAttribute, 2> sceneVertexAttribute{{{
-			.location = 0,
-			.buffer_slot = 0,
-			.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
-			.offset = 0
-		}, {
-			.location = 1,
-			.buffer_slot = 0,
-			.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4,
-			.offset = sizeof(float) * 3
-		}}};
+		std::array<SDL_GPUVertexAttribute, 2> sceneVertexAttribute{{
+			{ // position
+				.location = 0,
+				.buffer_slot = 0,
+				.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
+				.offset = 0
+			},
+			//{ // color
+			//	.location = 1,
+			//	.buffer_slot = 0,
+			//	.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4,
+			//	.offset = sizeof(float) * 3
+			//}
+			{ // UV
+				.location = 1,
+				.buffer_slot = 0,
+				.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
+				.offset = sizeof(float) * 3
+			}
+		}};
 		std::array<SDL_GPUColorTargetDescription, 1> sceneColorTargetDescription{{{
 			.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM
 		}}};
@@ -151,9 +180,10 @@ static int Init_cpp(Context* context)
 
 		SmartContext->vulkanDevice = std::make_unique<vks::VulkanDevice>(context->Device, context->Window);
 		SmartContext->model = std::make_unique<vkglTF::Model>();
-		SmartContext->model->loadFromFile("Content/Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
+		//SmartContext->model->loadFromFile("Content/Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 		//SmartContext->model->loadFromFile("Content/Models/Box/glTF-Embedded/Box.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 		//SmartContext->model->loadFromFile("Content/Models/green_cube/glTF/green_cube.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
+		SmartContext->model->loadFromFile("Content/Models/Dumpy/glTF/dumpy.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 
 
 
@@ -258,6 +288,9 @@ static int Draw_cpp(Context* context)
 
 		SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
 		SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
+
+		SDL_GPUTextureSamplerBinding textureSamplerBinding{ .texture = SmartContext->model->textures[0].view, .sampler = SmartContext->model->textures[0].sampler };
+		SDL_BindGPUFragmentSamplers(renderPass, 0, &textureSamplerBinding, 1);
 
 		SmartContext->model->draw(renderPass);
 
