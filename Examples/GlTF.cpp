@@ -288,10 +288,22 @@ static int Draw_cpp(Context* context)
 		SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
 		SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
 
-		SDL_GPUTextureSamplerBinding textureSamplerBinding{ .texture = SmartContext->model->textures[1].view, .sampler = SmartContext->model->textures[1].sampler };// PRECHECKIN: texture index hack
-		SDL_BindGPUFragmentSamplers(renderPass, 0, &textureSamplerBinding, 1);
 
-		SmartContext->model->draw(renderPass);
+		// NOTE: this is hacky and making assumptions about the model, look at https://github.com/SaschaWillems/Vulkan-glTF-PBR, VulkanApplication::renderNode for the proper way
+		for (const vkglTF::Material& material : SmartContext->model->materials) {
+			// look for the first material with a baseColorTexture
+			if (material.baseColorTexture == nullptr) {
+				continue;
+			}
+
+			SDL_GPUTextureSamplerBinding textureSamplerBinding{ .texture = material.baseColorTexture->view, .sampler = material.baseColorTexture->sampler };
+			SDL_BindGPUFragmentSamplers(renderPass, 0, &textureSamplerBinding, 1);
+
+			SmartContext->model->draw(renderPass);
+
+			// hacky, rendering everything with the first material which has a baseColorTexture
+			break;
+		}
 
 		SDL_EndGPURenderPass(renderPass);
 	}
