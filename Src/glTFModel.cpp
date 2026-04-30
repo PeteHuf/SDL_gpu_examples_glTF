@@ -989,8 +989,11 @@ namespace vkglTF
 						Vertex& vert = loaderInfo.vertexBuffer[loaderInfo.vertexPos];
 						vert.pos = glm::vec4(glm::make_vec3(&bufferPos[v * posByteStride]), 1.0f);
 						// vert.normal = glm::normalize(glm::vec3(bufferNormals ? glm::make_vec3(&bufferNormals[v * normByteStride]) : glm::vec3(0.0f)));
-						vert.uv0 = bufferTexCoordSet0 ? glm::make_vec2(&bufferTexCoordSet0[v * uv0ByteStride]) : glm::vec3(0.0f);
-						// vert.uv1 = bufferTexCoordSet1 ? glm::make_vec2(&bufferTexCoordSet1[v * uv1ByteStride]) : glm::vec3(0.0f); // PRECHECKIN: bring back
+						vert.uv0 = bufferTexCoordSet0 ? glm::make_vec2(&bufferTexCoordSet0[v * uv0ByteStride]) : glm::vec2(0.0f);
+						// vert.uv1 = bufferTexCoordSet1 ? glm::make_vec2(&bufferTexCoordSet1[v * uv1ByteStride]) : glm::vec2(0.0f); // PRECHECKIN: bring back
+
+						//auto posdump = std::format("pos: {},{},{}, UV: {}, {}", vert.pos.x, vert.pos.y, vert.pos.z, vert.uv0.x, vert.uv0.y);
+						//std::cout << posdump << std::endl; // PRECHECKIN: rem
 
 						//vert.color = bufferColorSet0 ? glm::make_vec4(&bufferColorSet0[v * color0ByteStride]) : glm::vec4(1.0f);
 						//vert.color = bufferColorSet0 ? glm::make_vec4(&bufferColorSet0[v * color0ByteStride]) : // PRECHECKIN: putback
@@ -999,6 +1002,15 @@ namespace vkglTF
 						//		(vert.pos.y + 1.0f) / 2,
 						//		(vert.pos.z + 1.0f) / 2,
 						//		1.0f);
+
+
+						//if (bufferTexCoordSet0) { // PRECHECKIN: hack
+						//	glm::vec2 raw = glm::make_vec2(&bufferTexCoordSet0[v * uv0ByteStride]);
+						//	vert.uv0.x = raw.y;
+						//	vert.uv0.y = raw.x;
+						//}
+
+
 
 
 						// if (hasSkin)
@@ -1054,6 +1066,7 @@ namespace vkglTF
 						const uint16_t *buf = static_cast<const uint16_t*>(dataPtr);
 						for (size_t index = 0; index < accessor.count; index++) {
 							loaderInfo.indexBuffer[loaderInfo.indexPos] = buf[index] + vertexStart;
+							//std::cout << loaderInfo.indexBuffer[loaderInfo.indexPos] << std::endl; // PRECHECKIN: rem
 							loaderInfo.indexPos++;
 						}
 						break;
@@ -1644,13 +1657,13 @@ namespace vkglTF
 			SDL_ReleaseGPUTransferBuffer(device->logicalDevice, indexStaging.buffer);
 		}
 
-		for (int i = 0; i < loaderInfo.vertexPos; ++i) {
-			vertexBufferHackyStorage.emplace_back(loaderInfo.vertexBuffer[i]);
-		}
+		//for (int i = 0; i < loaderInfo.vertexPos; ++i) {
+		//	vertexBufferHackyStorage.emplace_back(loaderInfo.vertexBuffer[i]); // PRECHECKIN: cleanup
+		//}
 
-		for (int i = 0; i < loaderInfo.indexPos; ++i) {
-			indexBufferHackyStorage.emplace_back(loaderInfo.indexBuffer[i]);
-		}
+		//for (int i = 0; i < loaderInfo.indexPos; ++i) {
+		//	indexBufferHackyStorage.emplace_back(loaderInfo.indexBuffer[i]);
+		//}
 
 		delete[] loaderInfo.vertexBuffer;
 		delete[] loaderInfo.indexBuffer;

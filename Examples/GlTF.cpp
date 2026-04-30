@@ -16,11 +16,11 @@ static float Time;
 static int SceneWidth, SceneHeight;
 static float WorldScale = 1.0f;
 
-typedef struct GlmPositionColorVertex
-{
-	glm::vec3 pos;
-	glm::vec4 color;
-} GlmPositionColorVertex;
+//typedef struct GlmPositionColorVertex
+//{
+//	glm::vec3 pos;
+//	glm::vec4 color;
+//} GlmPositionColorVertex;
 
 struct SmartContext_t {
 	std::unique_ptr<vks::VulkanDevice> vulkanDevice{};
@@ -30,8 +30,8 @@ struct SmartContext_t {
 	static constexpr SDL_GPUIndexElementSize index_element_size = SDL_GPU_INDEXELEMENTSIZE_32BIT;
 
 
-	Uint32 vertCount{};
-	Uint32 indexCount{};
+	//Uint32 vertCount{}; // PRECHECKIN: cleanup
+	//Uint32 indexCount{};
 
 	vkglTF::BoundingBox aabb{};
 };
@@ -64,15 +64,14 @@ static int Init_cpp(Context* context)
 
 
 
-		// Create the shaders
-		SDL_GPUShader* sceneVertexShader = LoadShader(context->Device, "TexturedQuad.vert", 0, 0, 0, 0); // PRECHECKIN: needs a new shader, but the texture is loading
+		SDL_GPUShader* sceneVertexShader = LoadShader(context->Device, "PositionTexturedTransform.vert", 0, 1, 0, 0); // PRECHECKIN: needs a new shader, but the texture is loading
 		if (sceneVertexShader == NULL)
 		{
 			SDL_Log("Failed to create vertex shader!");
 			return -1;
 		}
 
-		SDL_GPUShader* sceneFragmentShader = LoadShader(context->Device, "TexturedQuad.frag", 1, 0, 0, 0);
+		SDL_GPUShader* sceneFragmentShader = LoadShader(context->Device, "TexturedDepth.frag", 1, 1, 0, 0);
 		if (sceneFragmentShader == NULL)
 		{
 			SDL_Log("Failed to create fragment shader!");
@@ -84,7 +83,7 @@ static int Init_cpp(Context* context)
 
 		std::array<SDL_GPUVertexBufferDescription, 1> sceneVertexBufferDescription{{{
 			.slot = 0,
-			.pitch = sizeof(GlmPositionColorVertex),
+			.pitch = sizeof(vkglTF::Model::Vertex),
 			.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
 			.instance_step_rate = 0
 		}}};
@@ -183,12 +182,12 @@ static int Init_cpp(Context* context)
 		//SmartContext->model->loadFromFile("Content/Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 		//SmartContext->model->loadFromFile("Content/Models/Box/glTF-Embedded/Box.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 		//SmartContext->model->loadFromFile("Content/Models/green_cube/glTF/green_cube.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
-		SmartContext->model->loadFromFile("Content/Models/Dumpy/glTF/dumpy.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
+		SmartContext->model->loadFromFile("Content/Models/Dumpy_normals/glTF/dumpy_norm.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 
 
 
-		SmartContext->vertCount = static_cast<Uint32>(SmartContext->model->vertexBufferHackyStorage.size());
-		SmartContext->indexCount = static_cast<Uint32>(SmartContext->model->indexBufferHackyStorage.size());
+		//SmartContext->vertCount = static_cast<Uint32>(SmartContext->model->vertexBufferHackyStorage.size()); // PRECHECKIN: cleanup
+		//SmartContext->indexCount = static_cast<Uint32>(SmartContext->model->indexBufferHackyStorage.size());
 
 
 		SmartContext->aabb = vkglTF::BoundingBox(glm::vec3(-1), glm::vec3(1));
@@ -289,7 +288,7 @@ static int Draw_cpp(Context* context)
 		SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
 		SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
 
-		SDL_GPUTextureSamplerBinding textureSamplerBinding{ .texture = SmartContext->model->textures[0].view, .sampler = SmartContext->model->textures[0].sampler };
+		SDL_GPUTextureSamplerBinding textureSamplerBinding{ .texture = SmartContext->model->textures[1].view, .sampler = SmartContext->model->textures[1].sampler };// PRECHECKIN: texture index hack
 		SDL_BindGPUFragmentSamplers(renderPass, 0, &textureSamplerBinding, 1);
 
 		SmartContext->model->draw(renderPass);

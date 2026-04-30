@@ -246,8 +246,8 @@ namespace vkglTF
 			size_t vertexPos = 0;
 		};
 
-		std::vector<uint32_t> indexBufferHackyStorage{};
-		std::vector<Vertex> vertexBufferHackyStorage{};
+		//std::vector<uint32_t> indexBufferHackyStorage{}; // PRECHECKIN: cleanup
+		//std::vector<Vertex> vertexBufferHackyStorage{};
 
 
 		std::string filePath;
