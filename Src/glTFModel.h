@@ -204,9 +204,9 @@ namespace vkglTF
 
 		struct Vertex {
 			glm::vec3 pos;
-				// glm::vec3 normal; // PRECHECKIN: bring these back
+			glm::vec3 normal;
 			glm::vec2 uv0;
-				// glm::vec2 uv1;
+				// glm::vec2 uv1; // PRECHECKIN: bring these back
 				// glm::uvec4 joint0;
 				// glm::vec4 weight0;
 			//glm::vec4 color;

@@ -71,7 +71,11 @@ static int Init_cpp(Context* context)
 			return -1;
 		}
 
-		SDL_GPUShader* sceneFragmentShader = LoadShader(context->Device, "TexturedDepth.frag", 1, 1, 0, 0);
+		int samplerCount = 0;
+		++samplerCount; // colors
+		++samplerCount; // normals
+
+		SDL_GPUShader* sceneFragmentShader = LoadShader(context->Device, "TexturedDepth.frag", samplerCount, 1, 0, 0);
 		if (sceneFragmentShader == NULL)
 		{
 			SDL_Log("Failed to create fragment shader!");
@@ -87,12 +91,18 @@ static int Init_cpp(Context* context)
 			.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
 			.instance_step_rate = 0
 		}}};
-		std::array<SDL_GPUVertexAttribute, 2> sceneVertexAttribute{{
+		std::array<SDL_GPUVertexAttribute, 3> sceneVertexAttribute{{
 			{ // position
 				.location = 0,
 				.buffer_slot = 0,
 				.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
 				.offset = 0
+			},
+			{ // normal
+				.location = 1,
+				.buffer_slot = 0,
+				.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
+				.offset = sizeof(float) * 3
 			},
 			//{ // color
 			//	.location = 1,
@@ -101,10 +111,10 @@ static int Init_cpp(Context* context)
 			//	.offset = sizeof(float) * 3
 			//}
 			{ // UV
-				.location = 1,
+				.location = 2,
 				.buffer_slot = 0,
 				.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
-				.offset = sizeof(float) * 3
+				.offset = sizeof(float) * 3 + sizeof(float) * 3
 			}
 		}};
 		std::array<SDL_GPUColorTargetDescription, 1> sceneColorTargetDescription{{{
@@ -117,7 +127,7 @@ static int Init_cpp(Context* context)
 				.vertex_buffer_descriptions = sceneVertexBufferDescription.data(),
 				.num_vertex_buffers = 1,
 				.vertex_attributes = sceneVertexAttribute.data(),
-				.num_vertex_attributes = 2
+				.num_vertex_attributes = sceneVertexAttribute.size()
 			},
 			.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
 			.rasterizer_state = SDL_GPURasterizerState{
@@ -220,10 +230,9 @@ static int Update_cpp(Context* context)
 }
 
 struct VertexUBO {
-	Matrix4x4 world{};
+	Matrix4x4 model{};
 	Matrix4x4 view{};
 	Matrix4x4 projection{};
-	//Matrix4x4 xfrm{};
 };
 
 static int Draw_cpp(Context* context)
@@ -249,22 +258,43 @@ static int Draw_cpp(Context* context)
 
 		VertexUBO vertexUBO{};
 
-		vertexUBO.world = Matrix4x4_CreateScale( // PRECHECKIN: cleanup
+		vertexUBO.model = Matrix4x4_CreateScale( // PRECHECKIN: cleanup
 			WorldScale,
 			WorldScale,
 			WorldScale
 		);
+
+		//Matrix4x4 rotateModel = Matrix4x4_CreateLookAt(
+		//	Vector3{ SDL_cosf(Time) * 30, 30, SDL_sinf(Time) * 30 },
+		//	Vector3{ 0, 0, 0 },
+		//	Vector3{ 0, 0, 0 }
+		//);
+
+		//vertexUBO.model = Matrix4x4_Multiply(Matrix4x4_Multiply(vertexUBO.model, rotateModel), vertexUBO.projection);
+
 		vertexUBO.projection = Matrix4x4_CreatePerspectiveFieldOfView(
 			75.0f * SDL_PI_F / 180.0f,
 			SceneWidth / (float)SceneHeight,
 			nearPlane,
 			farPlane
 		);
+
+#define ROTATE_CAMERA
+
+//#ifdef ROTATE_CAMERA
 		vertexUBO.view = Matrix4x4_CreateLookAt(
 			Vector3{ SDL_cosf(Time) * 30, 30, SDL_sinf(Time) * 30 },
 			Vector3{ 0, 0, 0 },
 			Vector3{ 0, 1, 0 }
 		);
+//#else
+//		const float fixedCameraAngleTime = 1.0f;
+//		vertexUBO.view = Matrix4x4_CreateLookAt(
+//			Vector3{ SDL_cosf(fixedCameraAngleTime) * 30, 30, SDL_sinf(fixedCameraAngleTime) * 30 },
+//			Vector3{ 0, 0, 0 },
+//			Vector3{ 0, 1, 0 }
+//		);
+//#endif
 
 		//Matrix4x4 viewproj = Matrix4x4_Multiply(view, proj); // PRECHECKIN: cleanup
 		//Matrix4x4 viewproj = Matrix4x4_Multiply(Matrix4x4_Multiply(world, view), proj);
@@ -306,8 +336,16 @@ static int Draw_cpp(Context* context)
 				continue;
 			}
 
-			SDL_GPUTextureSamplerBinding textureSamplerBinding{ .texture = material.baseColorTexture->view, .sampler = material.baseColorTexture->sampler };
-			SDL_BindGPUFragmentSamplers(renderPass, 0, &textureSamplerBinding, 1);
+			enum class TextureIndex : size_t {
+				Colors = 0,
+				Normals = 1
+			};
+
+			std::array<SDL_GPUTextureSamplerBinding, 2> textureSamplerBindings{};
+			textureSamplerBindings.at(static_cast<size_t>(TextureIndex::Colors)) = SDL_GPUTextureSamplerBinding{ .texture = material.baseColorTexture->view, .sampler = material.baseColorTexture->sampler };
+			textureSamplerBindings.at(static_cast<size_t>(TextureIndex::Normals)) = SDL_GPUTextureSamplerBinding{ .texture = material.normalTexture->view, .sampler = material.normalTexture->sampler };
+
+			SDL_BindGPUFragmentSamplers(renderPass, 0, textureSamplerBindings.data(), textureSamplerBindings.size());
 
 			SmartContext->model->draw(renderPass);
 

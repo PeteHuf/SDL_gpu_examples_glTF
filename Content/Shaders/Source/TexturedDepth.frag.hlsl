@@ -1,5 +1,8 @@
-Texture2D<float4> Texture : register(t0, space2);
-SamplerState Sampler : register(s0, space2);
+Texture2D<float4> ColorTexture : register(t0, space2);
+SamplerState ColorSampler : register(s0, space2);
+
+Texture2D<float4> NormalTexture : register(t1, space2);
+SamplerState NormalSampler : register(s1, space2);
 
 cbuffer UBO : register(b0, space3)
 {
@@ -19,15 +22,15 @@ float LinearizeDepth(float depth, float near, float far)
     return ((2.0 * near * far) / (far + near - z * (far - near))) / far;
 }
 
-//Output main(float2 TexCoord : TEXCOORD0, float4 Position : SV_Position, float3 Normal : NORMAL0)
-Output main(float2 TexCoord : TEXCOORD0, float4 Position : SV_Position)
+Output main(float4 Position : SV_Position, float4 Normal : NORMAL0, float2 TexCoord : TEXCOORD0)
 {
-    float3 lightDir = normalize(float3(-1, -1, -1));
+    float3 lightDir = normalize(float3(1, 0.5, 1));
+    
+    float3 normalSample = normalize(NormalTexture.Sample(NormalSampler, TexCoord).xyz);
     
     Output result;
-    result.Color = Texture.Sample(Sampler, TexCoord);
-    //result.Color *= dot(lightDir, Normal);
-    //result.Color = float4(1, 0, 0, 1); // PRECHECKIN: remove
+    result.Color = ColorTexture.Sample(ColorSampler, TexCoord);
+    result.Color *= 0.5 + 0.5 * dot(lightDir, normalize(normalize(Normal.xyz) + normalSample));
     result.Depth = LinearizeDepth(Position.z, NearPlane, FarPlane);
     return result;
 }
