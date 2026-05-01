@@ -219,6 +219,13 @@ static int Update_cpp(Context* context)
 	return 0;
 }
 
+struct VertexUBO {
+	Matrix4x4 world{};
+	Matrix4x4 view{};
+	Matrix4x4 projection{};
+	//Matrix4x4 xfrm{};
+};
+
 static int Draw_cpp(Context* context)
 {
 	SDL_GPUCommandBuffer* cmdbuf = SDL_AcquireGPUCommandBuffer(context->Device);
@@ -240,25 +247,28 @@ static int Draw_cpp(Context* context)
 		float nearPlane = 20.0f;
 		float farPlane = 60.0f;
 
-		Matrix4x4 world = Matrix4x4_CreateScale( // PRECHECKIN: cleanup
+		VertexUBO vertexUBO{};
+
+		vertexUBO.world = Matrix4x4_CreateScale( // PRECHECKIN: cleanup
 			WorldScale,
 			WorldScale,
 			WorldScale
 		);
-		Matrix4x4 proj = Matrix4x4_CreatePerspectiveFieldOfView(
+		vertexUBO.projection = Matrix4x4_CreatePerspectiveFieldOfView(
 			75.0f * SDL_PI_F / 180.0f,
 			SceneWidth / (float)SceneHeight,
 			nearPlane,
 			farPlane
 		);
-		Matrix4x4 view = Matrix4x4_CreateLookAt(
+		vertexUBO.view = Matrix4x4_CreateLookAt(
 			Vector3{ SDL_cosf(Time) * 30, 30, SDL_sinf(Time) * 30 },
 			Vector3{ 0, 0, 0 },
 			Vector3{ 0, 1, 0 }
 		);
 
 		//Matrix4x4 viewproj = Matrix4x4_Multiply(view, proj); // PRECHECKIN: cleanup
-		Matrix4x4 viewproj = Matrix4x4_Multiply(Matrix4x4_Multiply(world, view), proj);
+		//Matrix4x4 viewproj = Matrix4x4_Multiply(Matrix4x4_Multiply(world, view), proj);
+		//vertexUBO.xfrm = Matrix4x4_Multiply(Matrix4x4_Multiply(vertexUBO.world, vertexUBO.view), vertexUBO.projection);
 
 		SDL_GPUDepthStencilTargetInfo depthStencilTargetInfo = { 0 };
 		depthStencilTargetInfo.texture = SceneDepthTexture;
@@ -270,7 +280,7 @@ static int Draw_cpp(Context* context)
 		depthStencilTargetInfo.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
 		depthStencilTargetInfo.stencil_store_op = SDL_GPU_STOREOP_STORE;
 
-		SDL_PushGPUVertexUniformData(cmdbuf, 0, &viewproj, sizeof(viewproj));
+		SDL_PushGPUVertexUniformData(cmdbuf, 0, &vertexUBO, sizeof(vertexUBO));
 		std::array<float, 2> nearFarPlane{nearPlane, farPlane};
 		SDL_PushGPUFragmentUniformData(cmdbuf, 0, nearFarPlane.data(), 8);
 

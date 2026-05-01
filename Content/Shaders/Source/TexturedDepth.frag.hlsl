@@ -19,10 +19,15 @@ float LinearizeDepth(float depth, float near, float far)
     return ((2.0 * near * far) / (far + near - z * (far - near))) / far;
 }
 
+//Output main(float2 TexCoord : TEXCOORD0, float4 Position : SV_Position, float3 Normal : NORMAL0)
 Output main(float2 TexCoord : TEXCOORD0, float4 Position : SV_Position)
 {
+    float3 lightDir = normalize(float3(-1, -1, -1));
+    
     Output result;
     result.Color = Texture.Sample(Sampler, TexCoord);
+    //result.Color *= dot(lightDir, Normal);
+    //result.Color = float4(1, 0, 0, 1); // PRECHECKIN: remove
     result.Depth = LinearizeDepth(Position.z, NearPlane, FarPlane);
     return result;
 }
