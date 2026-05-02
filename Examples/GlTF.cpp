@@ -64,7 +64,7 @@ static int Init_cpp(Context* context)
 
 
 
-		SDL_GPUShader* sceneVertexShader = LoadShader(context->Device, "PositionTexturedTransform.vert", 0, 1, 0, 0); // PRECHECKIN: needs a new shader, but the texture is loading
+		SDL_GPUShader* sceneVertexShader = LoadShader(context->Device, "PositionTexturedTransform.vert", 0, 2, 0, 0); // PRECHECKIN: needs a new shader, but the texture is loading
 		if (sceneVertexShader == NULL)
 		{
 			SDL_Log("Failed to create vertex shader!");
@@ -91,30 +91,42 @@ static int Init_cpp(Context* context)
 			.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
 			.instance_step_rate = 0
 		}}};
-		std::array<SDL_GPUVertexAttribute, 3> sceneVertexAttribute{{
+		std::array<SDL_GPUVertexAttribute, 5> sceneVertexAttribute{{
 			{ // position
 				.location = 0,
 				.buffer_slot = 0,
-				.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
+				.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, // glm::vec3
 				.offset = 0
 			},
 			{ // normal
 				.location = 1,
 				.buffer_slot = 0,
-				.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
-				.offset = sizeof(float) * 3
+				.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, // glm::vec3
+				.offset = sizeof(glm::vec3)
 			},
 			//{ // color
 			//	.location = 1,
 			//	.buffer_slot = 0,
-			//	.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4,
+			//	.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, // glm::vec4
 			//	.offset = sizeof(float) * 3
 			//}
 			{ // UV
 				.location = 2,
 				.buffer_slot = 0,
-				.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
-				.offset = sizeof(float) * 3 + sizeof(float) * 3
+				.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, // glm::vec2
+				.offset = sizeof(glm::vec3) + sizeof(glm::vec3)
+			},
+			{ // joint
+				.location = 3,
+				.buffer_slot = 0,
+				.format = SDL_GPU_VERTEXELEMENTFORMAT_UINT4, // glm::uvec4
+				.offset = sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2)
+			},
+			{ // weight
+				.location = 4,
+				.buffer_slot = 0,
+				.format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, // glm::vec4
+				.offset = sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2) + sizeof(glm::uvec4)
 			}
 		}};
 		std::array<SDL_GPUColorTargetDescription, 1> sceneColorTargetDescription{{{
@@ -223,9 +235,57 @@ static int Init_cpp(Context* context)
 	return 0;
 }
 
+//void updateMeshDataBuffer(uint32_t index)
+//{
+//	// @todo: optimize (no push, use fixed size)
+//	std::vector<ShaderMeshData> shaderMeshData{};
+//	for (auto& node : models.scene.linearNodes) {
+//		ShaderMeshData meshData{};
+//		if (node->mesh) {
+//			memcpy(meshData.jointMatrix, node->mesh->jointMatrix, sizeof(glm::mat4) * MAX_NUM_JOINTS);
+//			meshData.jointcount = node->mesh->jointcount;
+//			meshData.matrix = node->mesh->matrix;
+//			shaderMeshData.push_back(meshData);
+//		}
+//	}
+//
+//	VkDeviceSize bufferSize = shaderMeshData.size() * sizeof(ShaderMeshData);
+//
+//	if (!vulkanDevice->requiresStaging) {
+//		memcpy(shaderMeshDataBuffers[index].mapped, shaderMeshData.data(), bufferSize);
+//	}
+//	else {
+//		Buffer stagingBuffer;
+//		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize, &stagingBuffer.buffer, &stagingBuffer.memory, shaderMeshData.data()));
+//		// Copy from staging buffers
+//		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+//		VkBufferCopy copyRegion{};
+//		copyRegion.size = bufferSize;
+//		vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, shaderMeshDataBuffers[index].buffer, 1, &copyRegion);
+//		vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
+//		stagingBuffer.device = device;
+//		stagingBuffer.destroy();
+//	}
+//}
+
 static int Update_cpp(Context* context)
 {
+	static int32_t animationIndex = 0; // PRECHECKIN: hack
+	static float animationTimer = 0.0f;
+
+
 	Time += context->DeltaTime;
+
+	if (/*(animate) &&*/ (SmartContext->model->animations.size() > 0)) {
+		animationTimer += context->DeltaTime;
+		if (animationTimer > SmartContext->model->animations[animationIndex].end) {
+			animationTimer -= SmartContext->model->animations[animationIndex].end;
+		}
+
+		SmartContext->model->updateAnimation(animationIndex, animationTimer);
+		//updateMeshDataBuffer(frameIndex);
+	}
+
 	return 0;
 }
 
@@ -233,6 +293,16 @@ struct VertexUBO {
 	Matrix4x4 model{};
 	Matrix4x4 view{};
 	Matrix4x4 projection{};
+};
+
+struct MeshShaderDataBlock {
+	glm::mat4 matrix;
+	glm::mat4 jointMatrix[MAX_NUM_JOINTS]{};
+	uint32_t jointcount{ 0 };
+};
+
+struct MeshData {
+	MeshShaderDataBlock meshData;
 };
 
 static int Draw_cpp(Context* context)
@@ -300,6 +370,17 @@ static int Draw_cpp(Context* context)
 		//Matrix4x4 viewproj = Matrix4x4_Multiply(Matrix4x4_Multiply(world, view), proj);
 		//vertexUBO.xfrm = Matrix4x4_Multiply(Matrix4x4_Multiply(vertexUBO.world, vertexUBO.view), vertexUBO.projection);
 
+
+
+		vkglTF::Node* curNode = SmartContext->model->nodes.at(0)->children.at(0); // PRECHECKIN: how to get the real one?
+
+		MeshData meshData{};
+		meshData.meshData.matrix = curNode->mesh->matrix;
+		meshData.meshData.jointcount = curNode->mesh->jointcount;
+		memcpy_s(meshData.meshData.jointMatrix, sizeof(meshData.meshData.jointMatrix), curNode->mesh->jointMatrix, sizeof(curNode->mesh->jointMatrix));
+
+
+
 		SDL_GPUDepthStencilTargetInfo depthStencilTargetInfo = { 0 };
 		depthStencilTargetInfo.texture = SceneDepthTexture;
 		depthStencilTargetInfo.cycle = true;
@@ -311,6 +392,8 @@ static int Draw_cpp(Context* context)
 		depthStencilTargetInfo.stencil_store_op = SDL_GPU_STOREOP_STORE;
 
 		SDL_PushGPUVertexUniformData(cmdbuf, 0, &vertexUBO, sizeof(vertexUBO));
+		SDL_PushGPUVertexUniformData(cmdbuf, 1, &meshData, sizeof(meshData));
+
 		std::array<float, 2> nearFarPlane{nearPlane, farPlane};
 		SDL_PushGPUFragmentUniformData(cmdbuf, 0, nearFarPlane.data(), 8);
 

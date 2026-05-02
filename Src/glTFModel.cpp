@@ -1013,33 +1013,36 @@ namespace vkglTF
 
 
 
-						// if (hasSkin)
-						// {
-						// 	switch (jointComponentType) {
-						// 	case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: {
-						// 		const uint16_t *buf = static_cast<const uint16_t*>(bufferJoints);
-						// 		vert.joint0 = glm::uvec4(glm::make_vec4(&buf[v * jointByteStride])); // PRECHECKIN: bring back
-						// 		break;
-						// 	}
-						// 	case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE: {
-						// 		const uint8_t *buf = static_cast<const uint8_t*>(bufferJoints);
-						// 		vert.joint0 = glm::vec4(glm::make_vec4(&buf[v * jointByteStride]));
-						// 		break;
-						// 	}
-						// 	default:
-						// 		// Not supported by spec
-						// 		std::cerr << "Joint component type " << jointComponentType << " not supported!" << std::endl;
-						// 		break;
-						// 	}
-						// }
-						// else {
-						// 	vert.joint0 = glm::vec4(0.0f);
-						// }
-						// vert.weight0 = hasSkin ? glm::make_vec4(&bufferWeights[v * weightByteStride]) : glm::vec4(0.0f);
-						// // Fix for all zero weights
-						// if (glm::length(vert.weight0) == 0.0f) {
-						// 	vert.weight0 = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-						// }
+						if (hasSkin)
+						{
+							switch (jointComponentType) {
+							case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: {
+								const uint16_t *buf = static_cast<const uint16_t*>(bufferJoints);
+								vert.joint0 = glm::uvec4(glm::make_vec4(&buf[v * jointByteStride])); // PRECHECKIN: bring back
+								break;
+							}
+							case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE: {
+								const uint8_t *buf = static_cast<const uint8_t*>(bufferJoints);
+								vert.joint0 = glm::vec4(glm::make_vec4(&buf[v * jointByteStride]));
+								break;
+							}
+							default:
+								// Not supported by spec
+								std::cerr << "Joint component type " << jointComponentType << " not supported!" << std::endl;
+								break;
+							}
+						}
+						else {
+							vert.joint0 = glm::vec4(0.0f);
+						}
+
+						vert.weight0 = hasSkin ? glm::make_vec4(&bufferWeights[v * weightByteStride]) : glm::vec4(0.0f);
+
+						// Fix for all zero weights
+						if (glm::length(vert.weight0) == 0.0f) {
+							vert.weight0 = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+						}
+
 						loaderInfo.vertexPos++;
 					}
 				}
