@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 project(SDL_gpu_examples)
 
+option(ENABLE_DX_DEBUGGING "Enables enhaced debugging with DX12 backend" OFF)
+
 set(CMAKE_CXX_STANDARD 23) # PRECHECKIN: should be in CMakePresets.json file?
 
 find_package(SDL3 CONFIG QUIET)
@@ -16,6 +18,10 @@ if(MSVC)
 else()
     set(xpl_compile_options)
     set(xpl_compile_definitions)
+endif()
+
+if (ENABLE_DX_DEBUGGING)
+    add_definitions(-DSDL_GLTF_DX_DEBUGGING)
 endif()
 
 add_subdirectory(External/SDL)
@@ -67,6 +73,7 @@ add_executable(SDL_gpu_examples
 
 target_link_libraries(SDL_gpu_examples
     SDL3::SDL3
+    $<$<BOOL:${ENABLE_DX_DEBUGGING}>:dxgi.lib>
 )
 
 target_include_directories(SDL_gpu_examples

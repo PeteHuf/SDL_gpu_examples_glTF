@@ -1,9 +1,18 @@
 #include <array>
 #include <numeric>
 
+#if defined(_DEBUG) && defined(SDL_GLTF_DX_DEBUGGING)
+#include <Initguid.h>
+#include <dxgidebug.h> // For DXGIGetDebugInterface1 and IDXGIDebug1
+#include <dxgi1_3.h>
+
+#undef LoadImage
+#endif
+
 extern "C" {
 
 #include "Common.h"
+#include <SDL3/SDL_gpu.h>
 
 } // extern "C"
 
@@ -15,6 +24,10 @@ static SDL_GPUTexture* SceneDepthTexture;
 static float Time;
 static int SceneWidth, SceneHeight;
 static float WorldScale = 1.0f;
+
+static float ClearDepth = 1.0f;
+static float ClearDepthStencil = 0;
+static SDL_FColor ClearColor{ 0.2f, 0.5f, 0.4f, 1.0f };
 
 //typedef struct GlmPositionColorVertex
 //{
@@ -130,7 +143,7 @@ static int Init_cpp(Context* context)
 			}
 		}};
 		std::array<SDL_GPUColorTargetDescription, 1> sceneColorTargetDescription{{{
-			.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM
+			.format = SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM // PRECHECKIN DXGI_FORMAT_B8G8R8A8_UNORM? was SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM, read from swapchain tex?
 		}}};
 		SDL_GPUGraphicsPipelineCreateInfo pipelineCreateInfo = {
 			.vertex_shader = sceneVertexShader,
@@ -179,6 +192,19 @@ static int Init_cpp(Context* context)
 		SceneWidth = w;
 		SceneHeight = h;
 
+
+
+		//SDL_SetGPUSwapchainParameters
+
+
+		SDL_PropertiesID depthTexturePropertySet = SDL_CreateProperties();
+		SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_DEPTH_FLOAT, ClearDepth);
+		SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_NUMBER, ClearDepthStencil);
+		//SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_R_FLOAT, ClearDepth);
+		//SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_G_FLOAT, ClearDepth);
+		//SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_B_FLOAT, ClearDepth);
+		//SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_A_FLOAT, ClearDepth);
+
 		SDL_GPUTextureCreateInfo depthTextureCreateInfo {
 			.type = SDL_GPU_TEXTURETYPE_2D,
 			.format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
@@ -187,13 +213,17 @@ static int Init_cpp(Context* context)
 			.height = static_cast<Uint32>(SceneHeight),
 			.layer_count_or_depth = 1,
 			.num_levels = 1,
-			.sample_count = SDL_GPU_SAMPLECOUNT_1
+			.sample_count = SDL_GPU_SAMPLECOUNT_1,
+			.props = depthTexturePropertySet
 		};
 		SceneDepthTexture = SDL_CreateGPUTexture(
 			context->Device,
 			&depthTextureCreateInfo
 		);
 	}
+
+	// PRECHECKIN: address
+	//D3D12 WARNING: ID3D12CommandList::ClearDepthStencilView: The clear values do not match those passed to resource creation. The clear operation is typically slower as a result; but will still clear to the desired value. [ EXECUTION WARNING #821: CLEARDEPTHSTENCILVIEW_MISMATCHINGCLEARVALUE]
 
 	SmartContext = new SmartContext_t{};
 
@@ -384,8 +414,8 @@ static int Draw_cpp(Context* context)
 		SDL_GPUDepthStencilTargetInfo depthStencilTargetInfo = { 0 };
 		depthStencilTargetInfo.texture = SceneDepthTexture;
 		depthStencilTargetInfo.cycle = true;
-		depthStencilTargetInfo.clear_depth = 1;
-		depthStencilTargetInfo.clear_stencil = 0;
+		depthStencilTargetInfo.clear_depth = ClearDepth;
+		depthStencilTargetInfo.clear_stencil = ClearDepthStencil;
 		depthStencilTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
 		depthStencilTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
 		depthStencilTargetInfo.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
@@ -400,7 +430,7 @@ static int Draw_cpp(Context* context)
 		// Render the object
 		SDL_GPUColorTargetInfo swapchainTargetInfo = { 0 };
 		swapchainTargetInfo.texture = swapchainTexture;
-		swapchainTargetInfo.clear_color = SDL_FColor{ 0.2f, 0.5f, 0.4f, 1.0f };
+		swapchainTargetInfo.clear_color = ClearColor;
 		swapchainTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
 		swapchainTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
 
@@ -446,6 +476,8 @@ static int Draw_cpp(Context* context)
 
 static void Quit_cpp(Context* context)
 {
+	SmartContext->model->destroy(context->Device);
+
 	delete SmartContext;
 	SmartContext = nullptr;
 
@@ -453,6 +485,15 @@ static void Quit_cpp(Context* context)
 	SDL_ReleaseGPUTexture(context->Device, SceneDepthTexture);
 
 	CommonQuit(context);
+
+#if defined(_DEBUG) && defined(SDL_GLTF_DX_DEBUGGING)
+	IDXGIDebug1* pDebug = nullptr;
+	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug))))
+	{
+		pDebug->ReportLiveObjects(DXGI_DEBUG_ALL, (DXGI_DEBUG_RLO_FLAGS)(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
+		pDebug->Release();
+	}
+#endif
 }
 
 

@@ -55,7 +55,9 @@ Output main(Input input)
 			input.Weight.z * meshData.jointMatrix[input.Joint.z] +
 			input.Weight.w * meshData.jointMatrix[input.Joint.w];
 
-        output.Position = output.Position = mul(mul(skinMat, transform), float4(input.Position, 1.0f));
+        //output.Position = output.Position = mul(mul(transform, skinMat), float4(input.Position, 1.0f));
+        
+        output.Position = output.Position = mul(mul(transform, mul(meshData.mat, skinMat)), float4(input.Position, 1.0f));
 
         //output.Position = mul(mul(mul(model, meshData.mat), skinMat), float4(input.Position, 1.0));
         //outNormal = normalize(transpose(inverse(mat3(model * meshData.mat * skinMat))) * input.Normal);
