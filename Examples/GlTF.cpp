@@ -1,6 +1,7 @@
 #include <array>
 #include <numeric>
 #include <cstdalign>
+#include <memory>
 
 #if defined(_DEBUG) && defined(SDL_GLTF_DX_DEBUGGING)
 #include <Initguid.h>
@@ -323,17 +324,17 @@ static int Update_cpp(Context* context)
 //__alignas_is_defined
 
 struct alignas(16) VertexUBO {
-	Matrix4x4 alignas(16) model{};
-	Matrix4x4 alignas(16) view{};
-	Matrix4x4 alignas(16) projection{};
+	alignas(16) Matrix4x4 model{};
+	alignas(16) Matrix4x4 view{};
+	alignas(16) Matrix4x4 projection{};
 };
 
 static_assert(alignof(VertexUBO) == 16, "alignof(VertexUBO) should be 16");
 
 struct alignas(16) MeshShaderDataBlock {
-	glm::mat4 alignas(16) matrix;
-	glm::mat4 alignas(16) jointMatrix[MAX_NUM_JOINTS]{};
-	uint32_t alignas(16) jointcount = 0;
+	alignas(16) glm::mat4 matrix;
+	alignas(16) glm::mat4 jointMatrix[MAX_NUM_JOINTS]{};
+	alignas(16) uint32_t jointcount = 0;
 };
 
 
@@ -349,7 +350,7 @@ struct alignas(16) MeshShaderDataBlock {
 static_assert(alignof(MeshShaderDataBlock) == 16, "alignof(VertexUBO) should be 16");
 
 struct alignas(16) MeshData {
-	MeshShaderDataBlock alignas(16) meshData;
+	alignas(16) MeshShaderDataBlock meshData;
 };
 
 static int Draw_cpp(Context* context)
@@ -424,8 +425,8 @@ static int Draw_cpp(Context* context)
 		MeshData meshData{};
 		meshData.meshData.matrix = curNode->mesh->matrix;
 		meshData.meshData.jointcount = curNode->mesh->jointcount;
-		memcpy_s(meshData.meshData.jointMatrix, sizeof(meshData.meshData.jointMatrix), curNode->mesh->jointMatrix, sizeof(curNode->mesh->jointMatrix));
-
+		SDL_memcpy(meshData.meshData.jointMatrix, curNode->mesh->jointMatrix, sizeof(curNode->mesh->jointMatrix));
+		static_assert(sizeof(meshData.meshData.jointMatrix) == sizeof(curNode->mesh->jointMatrix));
 
 
 		SDL_GPUDepthStencilTargetInfo depthStencilTargetInfo = { 0 };
