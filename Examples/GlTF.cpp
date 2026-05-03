@@ -1,5 +1,6 @@
 #include <array>
 #include <numeric>
+#include <cstdalign>
 
 #if defined(_DEBUG) && defined(SDL_GLTF_DX_DEBUGGING)
 #include <Initguid.h>
@@ -26,7 +27,7 @@ static int SceneWidth, SceneHeight;
 static float WorldScale = 1.0f;
 
 static float ClearDepth = 1.0f;
-static float ClearDepthStencil = 0;
+static Uint8 ClearDepthStencil = 0;
 static SDL_FColor ClearColor{ 0.2f, 0.5f, 0.4f, 1.0f };
 
 //typedef struct GlmPositionColorVertex
@@ -152,7 +153,7 @@ static int Init_cpp(Context* context)
 				.vertex_buffer_descriptions = sceneVertexBufferDescription.data(),
 				.num_vertex_buffers = 1,
 				.vertex_attributes = sceneVertexAttribute.data(),
-				.num_vertex_attributes = sceneVertexAttribute.size()
+				.num_vertex_attributes = static_cast<Uint32>(sceneVertexAttribute.size())
 			},
 			.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
 			.rasterizer_state = SDL_GPURasterizerState{
@@ -319,20 +320,36 @@ static int Update_cpp(Context* context)
 	return 0;
 }
 
-struct VertexUBO {
-	Matrix4x4 model{};
-	Matrix4x4 view{};
-	Matrix4x4 projection{};
+//__alignas_is_defined
+
+struct alignas(16) VertexUBO {
+	Matrix4x4 alignas(16) model{};
+	Matrix4x4 alignas(16) view{};
+	Matrix4x4 alignas(16) projection{};
 };
 
-struct MeshShaderDataBlock {
-	glm::mat4 matrix;
-	glm::mat4 jointMatrix[MAX_NUM_JOINTS]{};
-	uint32_t jointcount{ 0 };
+static_assert(alignof(VertexUBO) == 16, "alignof(VertexUBO) should be 16");
+
+struct alignas(16) MeshShaderDataBlock {
+	glm::mat4 alignas(16) matrix;
+	glm::mat4 alignas(16) jointMatrix[MAX_NUM_JOINTS]{};
+	uint32_t alignas(16) jointcount = 0;
 };
 
-struct MeshData {
-	MeshShaderDataBlock meshData;
+
+//typedef struct MeshShaderDataBlock_t {
+//	glm::mat4 matrix;
+//	union {
+//		uint32_t jointcount = 0;
+//		glm::vec4 pad;
+//	};
+//	glm::mat4 jointMatrix[MAX_NUM_JOINTS]{};
+//} SDL_ALIGNED(16) MeshShaderDataBlock;
+
+static_assert(alignof(MeshShaderDataBlock) == 16, "alignof(VertexUBO) should be 16");
+
+struct alignas(16) MeshData {
+	MeshShaderDataBlock alignas(16) meshData;
 };
 
 static int Draw_cpp(Context* context)
@@ -458,7 +475,7 @@ static int Draw_cpp(Context* context)
 			textureSamplerBindings.at(static_cast<size_t>(TextureIndex::Colors)) = SDL_GPUTextureSamplerBinding{ .texture = material.baseColorTexture->view, .sampler = material.baseColorTexture->sampler };
 			textureSamplerBindings.at(static_cast<size_t>(TextureIndex::Normals)) = SDL_GPUTextureSamplerBinding{ .texture = material.normalTexture->view, .sampler = material.normalTexture->sampler };
 
-			SDL_BindGPUFragmentSamplers(renderPass, 0, textureSamplerBindings.data(), textureSamplerBindings.size());
+			SDL_BindGPUFragmentSamplers(renderPass, 0, textureSamplerBindings.data(), static_cast<Uint32>(textureSamplerBindings.size()));
 
 			SmartContext->model->draw(renderPass);
 

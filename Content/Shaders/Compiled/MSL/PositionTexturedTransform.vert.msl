@@ -13,7 +13,7 @@ struct type_UBO
 struct MeshShaderDataBlock
 {
     float4x4 mat;
-    float4x4 jointMatrix[128];
+    float4x4 jointMatrix[32];
     uint jointCount;
 };
 

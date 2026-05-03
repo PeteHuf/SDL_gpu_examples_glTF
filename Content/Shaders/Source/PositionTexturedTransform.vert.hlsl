@@ -5,7 +5,8 @@ cbuffer UBO : register(b0, space1)
     float4x4 projection : packoffset(c8);
 };
 
-#define MAX_NUM_JOINTS 128
+//#define MAX_NUM_JOINTS 128
+#define MAX_NUM_JOINTS 32 // PRECHECKIN: When I make this the initial 128 the joint count gets lost on Vulcan
 
 struct MeshShaderDataBlock
 {

@@ -71,6 +71,7 @@ namespace vkglTF
 
 	void Texture::destroy()
 	{
+		SDL_ReleaseGPUSampler(this->device->logicalDevice, sampler);
 		SDL_ReleaseGPUTexture(this->device->logicalDevice, view);
 
 		// vkDestroyImageView(device->logicalDevice, view, nullptr);
@@ -319,7 +320,7 @@ namespace vkglTF
 			}
 			else {
 				buffer = &gltfimage.image[0];
-				bufferSize = gltfimage.image.size();
+				bufferSize = static_cast<Uint32>(gltfimage.image.size());
 			}
 		
 			// PNG supports up to 64 bits
