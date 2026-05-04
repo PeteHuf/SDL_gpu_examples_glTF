@@ -16,6 +16,11 @@ extern "C" {
 #include "Common.h"
 #include <SDL3/SDL_gpu.h>
 
+// workaround for Debian build
+#ifndef SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_NUMBER
+#define SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_NUMBER SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_UINT8
+#endif
+
 } // extern "C"
 
 #include "glTFModel.h"
@@ -194,21 +199,9 @@ static int Init_cpp(Context* context)
 		SceneWidth = w;
 		SceneHeight = h;
 
-
-
-		//SDL_SetGPUSwapchainParameters
-
-
 		SDL_PropertiesID depthTexturePropertySet = SDL_CreateProperties();
 		SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_DEPTH_FLOAT, ClearDepth);
-#ifdef SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_NUMBER
 		SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_NUMBER, ClearDepthStencil);
-#else
-		SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_UINT8, ClearDepthStencil);
-#endif
-		//SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_UINT8
-		//SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_NUMBER
-
 
 		SDL_GPUTextureCreateInfo depthTextureCreateInfo {
 			.type = SDL_GPU_TEXTURETYPE_2D,
