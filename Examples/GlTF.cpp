@@ -201,11 +201,14 @@ static int Init_cpp(Context* context)
 
 		SDL_PropertiesID depthTexturePropertySet = SDL_CreateProperties();
 		SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_DEPTH_FLOAT, ClearDepth);
+#ifdef SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_NUMBER
 		SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_NUMBER, ClearDepthStencil);
-		//SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_R_FLOAT, ClearDepth);
-		//SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_G_FLOAT, ClearDepth);
-		//SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_B_FLOAT, ClearDepth);
-		//SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_A_FLOAT, ClearDepth);
+#else
+		SDL_SetFloatProperty(depthTexturePropertySet, SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_UINT8, ClearDepthStencil);
+#endif
+		//SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_UINT8
+		//SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_NUMBER
+
 
 		SDL_GPUTextureCreateInfo depthTextureCreateInfo {
 			.type = SDL_GPU_TEXTURETYPE_2D,
