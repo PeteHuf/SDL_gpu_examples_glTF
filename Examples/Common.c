@@ -13,7 +13,7 @@ int CommonInit(Context* context, SDL_WindowFlags windowFlags)
 	context->Device = SDL_CreateGPUDevice(
 		SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL,
 		true,
-		"vulkan"/*NULL*/); // PRECHECKIN: eval
+		/*"vulkan"*/NULL); // PRECHECKIN: eval
 
 	if (context->Device == NULL)
 	{
