@@ -1466,10 +1466,104 @@ namespace vkglTF
 		}
 	}
 
+	bool SDL_impl_FileExists(const std::string &abs_filename, void *)
+	{
+		SDL_IOStream *fp = SDL_IOFromFile(abs_filename.c_str(), "rb");
+		if (fp == nullptr) {
+			return false;
+		}
+
+		SDL_CloseIO(fp);
+		return true;
+	}
+
+	std::string SDL_impl_ExpandFilePath(const std::string &filepath, void *)
+	{
+		// https://github.com/syoyo/tinygltf/issues/368
+		//
+		// No file path expansion in built-in FS function anymore, since glTF URI
+		// should not contain tilde('~') and environment variables, and for security
+		// reason(`wordexp`).
+		//
+		// Users need to supply `base_dir`(in `LoadASCIIFromString`,
+		// `LoadBinaryFromMemory`) in expanded absolute path.
+
+		return filepath;
+	}
+
+	bool SDL_impl_ReadWholeFile(std::vector<unsigned char> *out, std::string *err, const std::string &filepath, void *)
+	{
+		SDL_IOStream *f = SDL_IOFromFile(filepath.c_str(), "rb");
+		if (!f) {
+			if (err) {
+				(*err) += "File open error : " + filepath + "\n";
+			}
+			return false;
+		}
+
+		Sint64 sz = SDL_GetIOSize(f);
+
+		if (int64_t(sz) < 0) {
+			if (err) {
+				(*err) += "Invalid file size : " + filepath +
+									" (does the path point to a directory?)";
+			}
+			return false;
+		} else if (sz == 0) {
+			if (err) {
+				(*err) += "File is empty : " + filepath + "\n";
+			}
+			return false;
+		}
+
+		out->resize(sz);
+		SDL_ReadIO(f, out->data(), sz);
+
+		SDL_CloseIO(f); // PRECHECKIN: use scope exit
+
+		return true;
+	}
+
+	bool SDL_impl_WriteWholeFile(std::string *err, const std::string &filepath,	const std::vector<unsigned char> &contents, void *)
+	{
+		assert(false); // PRECHECKIN: no need to impl?
+		return false;
+		//std::ofstream f(UTF8ToWchar(filepath).c_str(), std::ofstream::binary);
+		//if (!f) {
+		//	if (err) {
+		//		(*err) += "File open error for writing : " + filepath + "\n";
+		//	}
+		//	return false;
+		//}
+
+		//f.write(reinterpret_cast<const char *>(&contents.at(0)),
+		//				static_cast<std::streamsize>(contents.size()));
+		//if (!f) {
+		//	if (err) {
+		//		(*err) += "File write error: " + filepath + "\n";
+		//	}
+		//	return false;
+		//}
+
+		//return true;
+	}
+
+
 	void Model::loadFromFile(std::string filename, vks::VulkanDevice* device, float scale)
 	{
 		tinygltf::Model gltfModel;
 		tinygltf::TinyGLTF gltfContext;
+
+		tinygltf::FsCallbacks fsCallbacks{
+			.FileExists = SDL_impl_FileExists,
+			.ExpandFilePath = SDL_impl_ExpandFilePath,
+			.ReadWholeFile = SDL_impl_ReadWholeFile,
+			.WriteWholeFile = SDL_impl_WriteWholeFile,
+			.user_data = nullptr
+		};
+
+		gltfContext.SetFsCallbacks(fsCallbacks);
+
 
 		std::string error;
 		std::string warning;

@@ -30,7 +30,7 @@ if(NOT SDL3_FOUND)
     FetchContent_Declare(
             SDL
             GIT_REPOSITORY https://github.com/libsdl-org/SDL
-            GIT_TAG        "release-3.2.16"
+            GIT_TAG        "release-3.4.8"
     )
     FetchContent_MakeAvailable(SDL)
 else()
@@ -41,68 +41,102 @@ endif()
 include_directories(External/glm)
 include_directories(External/tinygltf)
 
-add_executable(SDL_gpu_examples
-    Examples/main.c
-    Examples/Common.h
-    stb_image.h
-    Examples/Common.c
-    Examples/ClearScreen.c
-    Examples/ClearScreenMultiWindow.c
-    Examples/BasicTriangle.c
-    Examples/BasicVertexBuffer.c
-    Examples/CullMode.c
-    Examples/BasicStencil.c
-    Examples/InstancedIndexed.c
-    Examples/TexturedQuad.c
-    Examples/ComputeSampler.c
-    Examples/TexturedAnimatedQuad.c
-    Examples/Clear3DSlice.c
-    Examples/BasicCompute.c
-    Examples/ComputeUniforms.c
-    Examples/ToneMapping.c
-    Examples/CustomSampling.c
-    Examples/DrawIndirect.c
-    Examples/ComputeSpriteBatch.c
-    Examples/CopyAndReadback.c
-    Examples/CopyConsistency.c
-    Examples/Texture2DArray.c
-    Examples/TriangleMSAA.c
-    Examples/Cubemap.c
-    Examples/WindowResize.c
-    Examples/Blit2DArray.c
-    Examples/BlitCube.c
-    Examples/BlitMirror.c
-    Examples/GenerateMipmaps.c
-    Examples/GlTF.cpp
-    Examples/Latency.c
-    Examples/DepthSampler.c
-    Examples/PullSpriteBatch.c
-    Examples/TextureTypeTest.c
-    Examples/CompressedTextures.c
-    Src/glTFModel.cpp
-    Src/glTFModel.h
-    Src/VulkanDevice.hpp
+# Set the name of the executable
+set(EXECUTABLE_NAME SDL_gpu_examples)
+
+# Create an executable or a shared library based on the platform and add our sources to it
+if (ANDROID)
+    set(ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES ON)
+
+    # The SDL java code is hardcoded to load libmain.so on android, so we need to change EXECUTABLE_NAME
+    set(EXECUTABLE_NAME main)
+    add_library(${EXECUTABLE_NAME} SHARED)
+else()
+    add_executable(${EXECUTABLE_NAME})
+endif()
+
+# Add your sources to the target
+target_sources(${EXECUTABLE_NAME}
+        PRIVATE
+        Examples/main.c
+        Examples/Common.h
+        stb_image.h
+        Examples/Common.c
+        Examples/ClearScreen.c
+        Examples/ClearScreenMultiWindow.c
+        Examples/BasicTriangle.c
+        Examples/BasicVertexBuffer.c
+        Examples/CullMode.c
+        Examples/BasicStencil.c
+        Examples/InstancedIndexed.c
+        Examples/TexturedQuad.c
+        Examples/ComputeSampler.c
+        Examples/TexturedAnimatedQuad.c
+        Examples/Clear3DSlice.c
+        Examples/BasicCompute.c
+        Examples/ComputeUniforms.c
+        Examples/ToneMapping.c
+        Examples/CustomSampling.c
+        Examples/DrawIndirect.c
+        Examples/ComputeSpriteBatch.c
+        Examples/CopyAndReadback.c
+        Examples/CopyConsistency.c
+        Examples/Texture2DArray.c
+        Examples/TriangleMSAA.c
+        Examples/Cubemap.c
+        Examples/WindowResize.c
+        Examples/Blit2DArray.c
+        Examples/BlitCube.c
+        Examples/BlitMirror.c
+        Examples/GenerateMipmaps.c
+        Examples/GlTF.cpp
+        Examples/Latency.c
+        Examples/DepthSampler.c
+        Examples/PullSpriteBatch.c
+        Examples/TextureTypeTest.c
+        Examples/CompressedTextures.c
+        Src/glTFModel.cpp
+        Src/glTFModel.h
+        Src/VulkanDevice.hpp
 )
 
-target_link_libraries(SDL_gpu_examples
+target_link_libraries(${EXECUTABLE_NAME}
     SDL3::SDL3
     $<$<BOOL:${ENABLE_DX_DEBUGGING}>:dxgi.lib>
 )
 
-target_include_directories(SDL_gpu_examples
+target_include_directories(${EXECUTABLE_NAME}
     PRIVATE
     Src
 )
 
-add_custom_command(TARGET SDL_gpu_examples POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content $<TARGET_FILE_DIR:SDL_gpu_examples>/Content
-)
+if (ANDROID)
+     if (NOT MOBILE_ASSETS_DIR)
+        message(FATAL_ERROR "Building for Android, but MOBILE_ASSETS_DIR is not set")
+    endif()
+    file(MAKE_DIRECTORY "${MOBILE_ASSETS_DIR}")    # we need to create the project Assets dir otherwise CMake won't copy our assets.
+
+    # MOBILE_ASSETS_DIR is set in the gradle file via the cmake command line and points to the Android Studio Assets folder. 
+    # when we copy assets there, the Android build pipeline knows to add them to the apk. 
+    #set(outname "${MOBILE_ASSETS_DIR}/${filename}")    
+
+     # PRECHECKIN: using TARGET ${EXECUTABLE_NAME} wrong? copied from below but EXECUTABLE_NAME not referenced here
+    add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
+        #COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content ${MOBILE_ASSETS_DIR}/Content #PRECHECKIN: eval
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content ${MOBILE_ASSETS_DIR}
+    )
+else()
+    add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>/Content
+    )
+endif()
+
 
 if(WIN32)
     # copy the SDL3.dll to the target dir
     add_custom_command(
-        TARGET SDL_gpu_examples POST_BUILD
-        COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SDL3::SDL3-shared> $<TARGET_FILE_DIR:SDL_gpu_examples>
+        TARGET ${EXECUTABLE_NAME} POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SDL3::SDL3-shared> $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>
         VERBATIM
     )
 endif(WIN32)

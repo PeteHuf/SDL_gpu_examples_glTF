@@ -37,6 +37,9 @@
 
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 
+// supplying our own filesystem callbacks with SDL implementations
+#define TINYGLTF_NO_FS
+
 #include "tiny_gltf.h"
 
 // Changing this value here also requires changing it in the vertex shader

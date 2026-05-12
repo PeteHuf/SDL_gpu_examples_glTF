@@ -10,10 +10,18 @@
 
 int CommonInit(Context* context, SDL_WindowFlags windowFlags)
 {
-	context->Device = SDL_CreateGPUDevice(
-		SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL,
-		true,
-		/*"vulkan"*/NULL); // PRECHECKIN: eval
+	SDL_PropertiesID props = SDL_CreateProperties();
+	SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_SPIRV_BOOLEAN, true);
+	SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_DXIL_BOOLEAN, true);
+	SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_MSL_BOOLEAN, true);
+	SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN, true);
+	//SDL_SetStringProperty(props, SDL_PROP_GPU_DEVICE_CREATE_NAME_STRING, "vulkan"); // uncomment to force Vulkan on Windows
+
+	// Disable features for better Android compat
+	SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_FEATURE_CLIP_DISTANCE_BOOLEAN, false);
+
+	context->Device = SDL_CreateGPUDeviceWithProperties(props);
+	SDL_DestroyProperties(props);
 
 	if (context->Device == NULL)
 	{
