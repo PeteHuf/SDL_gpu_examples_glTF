@@ -129,8 +129,7 @@ if (ANDROID)
 
      # PRECHECKIN: using TARGET ${EXECUTABLE_NAME} wrong? copied from below but EXECUTABLE_NAME not referenced here
     add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
-        #COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content ${MOBILE_ASSETS_DIR}/Content #PRECHECKIN: eval
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content ${MOBILE_ASSETS_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content ${MOBILE_ASSETS_DIR}/Content
     )
 else()
     add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
