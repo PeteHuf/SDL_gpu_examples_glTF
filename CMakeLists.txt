@@ -24,18 +24,25 @@ if (ENABLE_DX_DEBUGGING)
     add_definitions(-DSDL_GLTF_DX_DEBUGGING)
 endif()
 
-if(NOT SDL3_FOUND)
-    message(STATUS "SDL3 not found. Building it from source.")
-    include(FetchContent)
-    FetchContent_Declare(
-            SDL
-            GIT_REPOSITORY https://github.com/libsdl-org/SDL
-            GIT_TAG        "release-3.4.8"
-    )
-    FetchContent_MakeAvailable(SDL)
-else()
-    find_package(SDL3 REQUIRED)
-endif()
+#if(NOT SDL3_FOUND)
+#    message(STATUS "SDL3 not found. Building it from source.")
+#    include(FetchContent)
+#    FetchContent_Declare(
+#            SDL
+#            GIT_REPOSITORY https://github.com/libsdl-org/SDL
+#            GIT_TAG        "release-3.4.8"
+#    )
+#    FetchContent_MakeAvailable(SDL)
+#else()
+#    find_package(SDL3 REQUIRED)
+#endif()
+
+
+# Configure SDL by calling its CMake file.
+# we use EXCLUDE_FROM_ALL so that its install targets and configs don't
+# pollute upwards into our configuration.
+add_subdirectory(External/SDL EXCLUDE_FROM_ALL)
+
 
 #add_subdirectory(External/SDL)
 include_directories(External/glm)
