@@ -49,8 +49,8 @@ android {
                     //path 'jni/CMakeLists.txt'
                     // relative path back to the project's CMakeLists.txt
                     // when using FindPackage on Windows this file is ending up in
-                    //  \SDL_gpu_examples_glTF\out\build\x64-Debug\_deps\sdl-src\android-project\app
-                    path '../../../../../../../CMakeLists.txt'
+                    //  .\External\SDL\android-project\app
+                    path '../../../../CMakeLists.txt'
                 }
             //} else {
             //    ndkBuild {
