@@ -12,6 +12,19 @@ find_package(SDL3 CONFIG QUIET)
 #set_source_files_properties(${C_FILES} PROPERTIES LANGUAGE CXX)
 
 
+if ((APPLE AND NOT CMAKE_SYSTEM_NAME MATCHES "Darwin") OR EMSCRIPTEN)
+    set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "")    # Disable shared builds on platforms where it does not make sense to use them
+    set(SDL_SHARED OFF)
+else()
+    set(SDL_SHARED ON)
+endif()
+
+if(MSVC)
+    if(NOT CMAKE_GENERATOR STREQUAL "Ninja")
+        add_definitions(/MP)				# parallelize each target, unless Ninja is the generator
+    endif()
+endif()
+
 if(MSVC)
     set(xpl_compile_options "/Zc:__cplusplus" "/bigobj") # PRECHECKIN: should be in CMakePresets.json file?
     set(xpl_compile_definitions "_UNICODE" "UNICODE")
