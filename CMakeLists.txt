@@ -1,18 +1,23 @@
-cmake_minimum_required(VERSION 3.10)
-project(SDL_gpu_examples)
+# largely based on https://github.com/Ravbug/sdl3-sample
+
+cmake_minimum_required(VERSION 3.16)
+
+# Set C++ version
+set(CMAKE_CXX_STANDARD 23)
+
+# set the output directory for built objects.
+# This makes sure that the dynamic library goes into the build directory automatically.
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
+
+# prevent installing to system directories. 
+set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}" CACHE INTERNAL "")
+
+project(SDL_gpu_examples_glTF)
 
 option(ENABLE_DX_DEBUGGING "Enables enhaced debugging with DX12 backend" OFF)
 
-set(CMAKE_CXX_STANDARD 23) # PRECHECKIN: should be in CMakePresets.json file?
-
-find_package(SDL3 CONFIG QUIET)
-
-## treat .c as .cpp
-#file(GLOB_RECURSE C_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.c") # PRECHECKIN: remove, too annoying to port all to cpp?
-#set_source_files_properties(${C_FILES} PROPERTIES LANGUAGE CXX)
-
-
-if ((APPLE AND NOT CMAKE_SYSTEM_NAME MATCHES "Darwin") OR EMSCRIPTEN)
+if (APPLE AND NOT CMAKE_SYSTEM_NAME MATCHES "Darwin")
     set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "")    # Disable shared builds on platforms where it does not make sense to use them
     set(SDL_SHARED OFF)
 else()
@@ -25,44 +30,12 @@ if(MSVC)
     endif()
 endif()
 
-if(MSVC)
-    set(xpl_compile_options "/Zc:__cplusplus" "/bigobj") # PRECHECKIN: should be in CMakePresets.json file?
-    set(xpl_compile_definitions "_UNICODE" "UNICODE")
-else()
-    set(xpl_compile_options)
-    set(xpl_compile_definitions)
-endif()
-
 if (ENABLE_DX_DEBUGGING)
     add_definitions(-DSDL_GLTF_DX_DEBUGGING)
 endif()
 
-#if(NOT SDL3_FOUND)
-#    message(STATUS "SDL3 not found. Building it from source.")
-#    include(FetchContent)
-#    FetchContent_Declare(
-#            SDL
-#            GIT_REPOSITORY https://github.com/libsdl-org/SDL
-#            GIT_TAG        "release-3.4.8"
-#    )
-#    FetchContent_MakeAvailable(SDL)
-#else()
-#    find_package(SDL3 REQUIRED)
-#endif()
-
-
-# Configure SDL by calling its CMake file.
-# we use EXCLUDE_FROM_ALL so that its install targets and configs don't
-# pollute upwards into our configuration.
-add_subdirectory(External/SDL EXCLUDE_FROM_ALL)
-
-
-#add_subdirectory(External/SDL)
-include_directories(External/glm)
-include_directories(External/tinygltf)
-
 # Set the name of the executable
-set(EXECUTABLE_NAME SDL_gpu_examples)
+set(EXECUTABLE_NAME SDL_gpu_examples_glTF)
 
 # Create an executable or a shared library based on the platform and add our sources to it
 if (ANDROID)
@@ -118,8 +91,29 @@ target_sources(${EXECUTABLE_NAME}
         Src/glTFModel.cpp
         Src/glTFModel.h
         Src/VulkanDevice.hpp
+        src/iosLaunchScreen.storyboard
 )
+# What is iosLaunchScreen.storyboard? This file describes what Apple's mobile platforms
+# should show the user while the application is starting up. If you don't include one,
+# then you get placed in a compatibility mode that does not allow HighDPI.
+# This file is referenced inside Info.plist.in, where it is marked as the launch screen file.
+# It is also ignored on non-Apple platforms. 
 
+# To get an app icon on Apple platforms, add it to your executable.
+# Afterward, the image file in Info.plist.in.
+if(APPLE)
+    target_sources("${EXECUTABLE_NAME}" PRIVATE "src/logo.png")
+endif()
+
+# Configure SDL by calling its CMake file.
+# we use EXCLUDE_FROM_ALL so that its install targets and configs don't
+# pollute upwards into our configuration.
+add_subdirectory(External/SDL EXCLUDE_FROM_ALL)
+
+include_directories(External/glm)
+include_directories(External/tinygltf)
+
+# Link SDL to our executable. This also makes its include directory available to us. 
 target_link_libraries(${EXECUTABLE_NAME}
     SDL3::SDL3
     $<$<BOOL:${ENABLE_DX_DEBUGGING}>:dxgi.lib>
@@ -130,17 +124,15 @@ target_include_directories(${EXECUTABLE_NAME}
     Src
 )
 
+# Dealing with assets
+# We have some non-code resources that our application needs in order to work. How we deal with those differs per platform.
 if (ANDROID)
-     if (NOT MOBILE_ASSETS_DIR)
+        if (NOT MOBILE_ASSETS_DIR)
         message(FATAL_ERROR "Building for Android, but MOBILE_ASSETS_DIR is not set")
     endif()
     file(MAKE_DIRECTORY "${MOBILE_ASSETS_DIR}")    # we need to create the project Assets dir otherwise CMake won't copy our assets.
 
-    # MOBILE_ASSETS_DIR is set in the gradle file via the cmake command line and points to the Android Studio Assets folder. 
-    # when we copy assets there, the Android build pipeline knows to add them to the apk. 
-    #set(outname "${MOBILE_ASSETS_DIR}/${filename}")    
-
-     # PRECHECKIN: using TARGET ${EXECUTABLE_NAME} wrong? copied from below but EXECUTABLE_NAME not referenced here
+    # PRECHECKIN: using TARGET ${EXECUTABLE_NAME} wrong? copied from below but EXECUTABLE_NAME not referenced here
     add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content ${MOBILE_ASSETS_DIR}/Content
     )
@@ -150,6 +142,50 @@ else()
     )
 endif()
 
+# set some extra configs for each platform
+set(RESOURCE_FILES "src/logo.png")
+if(IOS)
+    set(RESOURCE_FILES "src/iosLaunchScreen.storyboard;src/logo.png") # make the splash screen show up on iOS
+endif()
+
+set_target_properties(${EXECUTABLE_NAME} PROPERTIES 
+    # On macOS, make a proper .app bundle instead of a bare executable
+    MACOSX_BUNDLE TRUE
+    # Set the Info.plist file for Apple Mobile platforms. Without this file, your app
+    # will not launch. 
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/src/Info.plist.in"
+
+    # in Xcode, create a Scheme in the schemes dropdown for the app.
+    XCODE_GENERATE_SCHEME TRUE
+    # Identification for Xcode
+    XCODE_ATTRIBUTE_BUNDLE_IDENTIFIER "com.ravbug.sdl3-sample"
+	XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.ravbug.sdl3-sample"
+	XCODE_ATTRIBUTE_CURRENTYEAR "${CURRENTYEAR}"
+    RESOURCE "${RESOURCE_FILES}"
+)
+
+# on Visual Studio, set our app as the default project
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "${EXECUTABLE_NAME}")
+
+# On macOS Platforms, ensure that the bundle is valid for distribution by calling fixup_bundle.
+# note that fixup_bundle does not work on iOS, so you will want to use static libraries 
+# or manually copy dylibs and set rpaths
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    # tell Install about the target, otherwise fixup won't know about the transitive dependencies
+    install(TARGETS ${EXECUTABLE_NAME}
+    	BUNDLE DESTINATION ./install COMPONENT Runtime
+   	    RUNTIME DESTINATION ./install/bin COMPONENT Runtime
+    )
+	
+    set(DEP_DIR "${CMAKE_BINARY_DIR}")  # where to look for dependencies when fixing up
+    INSTALL(CODE 
+        "include(BundleUtilities)
+        fixup_bundle(\"$<TARGET_BUNDLE_DIR:${EXECUTABLE_NAME}>\" \"\" \"${DEP_DIR}\")
+        " 
+    )
+    set(CPACK_GENERATOR "DragNDrop")
+    include(CPack)
+endif()
 
 if(WIN32)
     # copy the SDL3.dll to the target dir
