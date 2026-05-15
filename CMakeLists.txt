@@ -91,7 +91,7 @@ target_sources(${EXECUTABLE_NAME}
         Src/glTFModel.cpp
         Src/glTFModel.h
         Src/VulkanDevice.hpp
-        src/iosLaunchScreen.storyboard
+        Src/iosLaunchScreen.storyboard
 )
 # What is iosLaunchScreen.storyboard? This file describes what Apple's mobile platforms
 # should show the user while the application is starting up. If you don't include one,
@@ -102,7 +102,7 @@ target_sources(${EXECUTABLE_NAME}
 # To get an app icon on Apple platforms, add it to your executable.
 # Afterward, the image file in Info.plist.in.
 if(APPLE)
-    target_sources("${EXECUTABLE_NAME}" PRIVATE "src/logo.png")
+    target_sources("${EXECUTABLE_NAME}" PRIVATE "Src/logo.png")
 endif()
 
 # Configure SDL by calling its CMake file.
@@ -127,7 +127,7 @@ target_include_directories(${EXECUTABLE_NAME}
 # Dealing with assets
 # We have some non-code resources that our application needs in order to work. How we deal with those differs per platform.
 if (ANDROID)
-        if (NOT MOBILE_ASSETS_DIR)
+    if (NOT MOBILE_ASSETS_DIR)
         message(FATAL_ERROR "Building for Android, but MOBILE_ASSETS_DIR is not set")
     endif()
     file(MAKE_DIRECTORY "${MOBILE_ASSETS_DIR}")    # we need to create the project Assets dir otherwise CMake won't copy our assets.
@@ -143,9 +143,9 @@ else()
 endif()
 
 # set some extra configs for each platform
-set(RESOURCE_FILES "src/logo.png")
+set(RESOURCE_FILES "Src/logo.png")
 if(IOS)
-    set(RESOURCE_FILES "src/iosLaunchScreen.storyboard;src/logo.png") # make the splash screen show up on iOS
+    set(RESOURCE_FILES "Src/iosLaunchScreen.storyboard;Src/logo.png") # make the splash screen show up on iOS
 endif()
 
 set_target_properties(${EXECUTABLE_NAME} PROPERTIES 
@@ -153,13 +153,13 @@ set_target_properties(${EXECUTABLE_NAME} PROPERTIES
     MACOSX_BUNDLE TRUE
     # Set the Info.plist file for Apple Mobile platforms. Without this file, your app
     # will not launch. 
-    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/src/Info.plist.in"
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Src/Info.plist.in"
 
     # in Xcode, create a Scheme in the schemes dropdown for the app.
     XCODE_GENERATE_SCHEME TRUE
     # Identification for Xcode
-    XCODE_ATTRIBUTE_BUNDLE_IDENTIFIER "com.ravbug.sdl3-sample"
-	XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.ravbug.sdl3-sample"
+    XCODE_ATTRIBUTE_BUNDLE_IDENTIFIER "com.petehufnagel.sdl-gpu-gltf"
+	Xcode_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.petehufnagel.sdl-gpu-gltf"
 	XCODE_ATTRIBUTE_CURRENTYEAR "${CURRENTYEAR}"
     RESOURCE "${RESOURCE_FILES}"
 )
@@ -173,8 +173,8 @@ set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
     # tell Install about the target, otherwise fixup won't know about the transitive dependencies
     install(TARGETS ${EXECUTABLE_NAME}
-    	BUNDLE DESTINATION ./install COMPONENT Runtime
-   	    RUNTIME DESTINATION ./install/bin COMPONENT Runtime
+    	BUNDLE DESTINATION install COMPONENT Runtime
+   	    RUNTIME DESTINATION install/bin COMPONENT Runtime
     )
 	
     set(DEP_DIR "${CMAKE_BINARY_DIR}")  # where to look for dependencies when fixing up
