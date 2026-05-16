@@ -225,15 +225,17 @@ static int Init_cpp(Context* context)
 	SmartContext = new SmartContext_t{};
 
 	{
+        const std::string basePath = SDL_GetBasePath();
+        
 		SmartContext->vulkanDevice = std::make_unique<vks::VulkanDevice>(context->Device, context->Window);
 		SmartContext->model = std::make_unique<vkglTF::Model>();
-		//SmartContext->model->loadFromFile("Content/Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
-		//SmartContext->model->loadFromFile("Content/Models/Box/glTF-Embedded/Box.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
-		//SmartContext->model->loadFromFile("Content/Models/green_cube/glTF/green_cube.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
-		SmartContext->model->loadFromFile("Content/Models/Dumpy_normals/glTF/dumpy_norm.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
+		//SmartContext->model->loadFromFile(basePath + "Content/Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
+		//SmartContext->model->loadFromFile(basePath + "Content/Models/Box/glTF-Embedded/Box.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
+		//SmartContext->model->loadFromFile(basePath + "Content/Models/green_cube/glTF/green_cube.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
+		SmartContext->model->loadFromFile(basePath + "Content/Models/Dumpy_normals/glTF/dumpy_norm.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 
 		// PRECHECKIN: this one is broken currently due to the many assumptions about model structure
-		//SmartContext->model->loadFromFile("Content/Models/Dumpy_bread/glTF/dump_bread_float.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
+		//SmartContext->model->loadFromFile(basePath + "Content/Models/Dumpy_bread/glTF/dump_bread_float.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 
 
 
