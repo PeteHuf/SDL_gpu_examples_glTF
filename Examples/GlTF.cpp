@@ -35,22 +35,12 @@ static float ClearDepth = 1.0f;
 static Uint8 ClearDepthStencil = 0;
 static SDL_FColor ClearColor{ 0.2f, 0.5f, 0.4f, 1.0f };
 
-//typedef struct GlmPositionColorVertex
-//{
-//	glm::vec3 pos;
-//	glm::vec4 color;
-//} GlmPositionColorVertex;
-
 struct SmartContext_t {
 	std::unique_ptr<vks::VulkanDevice> vulkanDevice{};
 	std::unique_ptr<vkglTF::Model> model{};
 
 	using IndexType = Uint32;
 	static constexpr SDL_GPUIndexElementSize index_element_size = SDL_GPU_INDEXELEMENTSIZE_32BIT;
-
-
-	//Uint32 vertCount{}; // PRECHECKIN: cleanup
-	//Uint32 indexCount{};
 
 	vkglTF::BoundingBox aabb{};
 };
@@ -83,7 +73,7 @@ static int Init_cpp(Context* context)
 
 
 
-		SDL_GPUShader* sceneVertexShader = LoadShader(context->Device, "PositionTexturedTransform.vert", 0, 2, 0, 0); // PRECHECKIN: needs a new shader, but the texture is loading
+		SDL_GPUShader* sceneVertexShader = LoadShader(context->Device, "PositionTexturedTransform.vert", 0, 2, 0, 0);
 		if (sceneVertexShader == NULL)
 		{
 			SDL_Log("Failed to create vertex shader!");
@@ -149,7 +139,7 @@ static int Init_cpp(Context* context)
 			}
 		}};
 		std::array<SDL_GPUColorTargetDescription, 1> sceneColorTargetDescription{{{
-			.format = SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM // PRECHECKIN DXGI_FORMAT_B8G8R8A8_UNORM? was SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM, read from swapchain tex?
+			.format = SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM
 		}}};
 		SDL_GPUGraphicsPipelineCreateInfo pipelineCreateInfo = {
 			.vertex_shader = sceneVertexShader,
@@ -219,8 +209,6 @@ static int Init_cpp(Context* context)
 		);
 	}
 
-	// PRECHECKIN: address
-	//D3D12 WARNING: ID3D12CommandList::ClearDepthStencilView: The clear values do not match those passed to resource creation. The clear operation is typically slower as a result; but will still clear to the desired value. [ EXECUTION WARNING #821: CLEARDEPTHSTENCILVIEW_MISMATCHINGCLEARVALUE]
 
 	SmartContext = new SmartContext_t{};
 
@@ -238,9 +226,6 @@ static int Init_cpp(Context* context)
 		//SmartContext->model->loadFromFile(basePath + "Content/Models/Dumpy_bread/glTF/dump_bread_float.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 
 
-
-		//SmartContext->vertCount = static_cast<Uint32>(SmartContext->model->vertexBufferHackyStorage.size()); // PRECHECKIN: cleanup
-		//SmartContext->indexCount = static_cast<Uint32>(SmartContext->model->indexBufferHackyStorage.size());
 
 
 		SmartContext->aabb = vkglTF::BoundingBox(glm::vec3(-1), glm::vec3(1));
@@ -375,19 +360,12 @@ static int Draw_cpp(Context* context)
 
 		VertexUBO vertexUBO{};
 
-		vertexUBO.model = Matrix4x4_CreateScale( // PRECHECKIN: cleanup
+		vertexUBO.model = Matrix4x4_CreateScale(
 			WorldScale,
 			WorldScale,
 			WorldScale
 		);
 
-		//Matrix4x4 rotateModel = Matrix4x4_CreateLookAt(
-		//	Vector3{ SDL_cosf(Time) * 30, 30, SDL_sinf(Time) * 30 },
-		//	Vector3{ 0, 0, 0 },
-		//	Vector3{ 0, 0, 0 }
-		//);
-
-		//vertexUBO.model = Matrix4x4_Multiply(Matrix4x4_Multiply(vertexUBO.model, rotateModel), vertexUBO.projection);
 
 		vertexUBO.projection = Matrix4x4_CreatePerspectiveFieldOfView(
 			75.0f * SDL_PI_F / 180.0f,
@@ -398,25 +376,20 @@ static int Draw_cpp(Context* context)
 
 #define ROTATE_CAMERA
 
-//#ifdef ROTATE_CAMERA
+#ifdef ROTATE_CAMERA
 		vertexUBO.view = Matrix4x4_CreateLookAt(
 			Vector3{ SDL_cosf(Time) * 30, 30, SDL_sinf(Time) * 30 },
 			Vector3{ 0, 0, 0 },
 			Vector3{ 0, 1, 0 }
 		);
-//#else
-//		const float fixedCameraAngleTime = 1.0f;
-//		vertexUBO.view = Matrix4x4_CreateLookAt(
-//			Vector3{ SDL_cosf(fixedCameraAngleTime) * 30, 30, SDL_sinf(fixedCameraAngleTime) * 30 },
-//			Vector3{ 0, 0, 0 },
-//			Vector3{ 0, 1, 0 }
-//		);
-//#endif
-
-		//Matrix4x4 viewproj = Matrix4x4_Multiply(view, proj); // PRECHECKIN: cleanup
-		//Matrix4x4 viewproj = Matrix4x4_Multiply(Matrix4x4_Multiply(world, view), proj);
-		//vertexUBO.xfrm = Matrix4x4_Multiply(Matrix4x4_Multiply(vertexUBO.world, vertexUBO.view), vertexUBO.projection);
-
+#else
+		const float fixedCameraAngleTime = 1.0f;
+		vertexUBO.view = Matrix4x4_CreateLookAt(
+			Vector3{ SDL_cosf(fixedCameraAngleTime) * 30, 30, SDL_sinf(fixedCameraAngleTime) * 30 },
+			Vector3{ 0, 0, 0 },
+			Vector3{ 0, 1, 0 }
+		);
+#endif
 
 
 		vkglTF::Node* curNode = SmartContext->model->nodes.at(0)->children.at(0); // PRECHECKIN: how to get the real one?

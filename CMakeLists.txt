@@ -124,29 +124,12 @@ target_include_directories(${EXECUTABLE_NAME}
     Src
 )
 
+# Dealing with assets
+
 # Gather assets
 set(ASSETS_LIST "") # Init the assets list
 add_subdirectory(Content) # Dive into the `Content` dir
 
-## Dealing with assets
-## We have some non-code resources that our application needs in order to work. How we deal with those differs per platform.
-#if (ANDROID)
-#    if (NOT MOBILE_ASSETS_DIR)
-#        message(FATAL_ERROR "Building for Android, but MOBILE_ASSETS_DIR is not set")
-#    endif()
-#    file(MAKE_DIRECTORY "${MOBILE_ASSETS_DIR}")    # we need to create the project Assets dir otherwise CMake won't copy our assets.
-#
-#    # PRECHECKIN: using TARGET ${EXECUTABLE_NAME} wrong? copied from below but EXECUTABLE_NAME not referenced here
-#    add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
-#        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content ${MOBILE_ASSETS_DIR}/Content
-#    )
-#else()
-#    add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
-#        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>/Content
-#    )
-#endif()
-
-# Dealing with assets
 # We have some non-code resources that our application needs in order to work. How we deal with those differs per platform.
 if (APPLE)
     # on Apple targets, the application bundle has a "resources" subfolder where we can place our assets.
