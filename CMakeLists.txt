@@ -124,23 +124,83 @@ target_include_directories(${EXECUTABLE_NAME}
     Src
 )
 
+# Gather assets
+set(ASSETS_LIST "") # Init the assets list
+add_subdirectory(Content) # Dive into the `Content` dir
+
+## Dealing with assets
+## We have some non-code resources that our application needs in order to work. How we deal with those differs per platform.
+#if (ANDROID)
+#    if (NOT MOBILE_ASSETS_DIR)
+#        message(FATAL_ERROR "Building for Android, but MOBILE_ASSETS_DIR is not set")
+#    endif()
+#    file(MAKE_DIRECTORY "${MOBILE_ASSETS_DIR}")    # we need to create the project Assets dir otherwise CMake won't copy our assets.
+#
+#    # PRECHECKIN: using TARGET ${EXECUTABLE_NAME} wrong? copied from below but EXECUTABLE_NAME not referenced here
+#    add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
+#        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content ${MOBILE_ASSETS_DIR}/Content
+#    )
+#else()
+#    add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
+#        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>/Content
+#    )
+#endif()
+
 # Dealing with assets
 # We have some non-code resources that our application needs in order to work. How we deal with those differs per platform.
-if (ANDROID)
-    if (NOT MOBILE_ASSETS_DIR)
-        message(FATAL_ERROR "Building for Android, but MOBILE_ASSETS_DIR is not set")
-    endif()
-    file(MAKE_DIRECTORY "${MOBILE_ASSETS_DIR}")    # we need to create the project Assets dir otherwise CMake won't copy our assets.
+if (APPLE)
+    # on Apple targets, the application bundle has a "resources" subfolder where we can place our assets.
+    # SDL_GetBasePath() gives us easy access to that location.
+    #set(input_root "${CMAKE_CURRENT_LIST_DIR}/src")
+    macro(add_resource FILE)
+        #file(RELATIVE_PATH relpath "${input_root}" "${FILE}")
+        #get_filename_component(relpath "${relpath}" DIRECTORY)
+        target_sources(${EXECUTABLE_NAME} PRIVATE ${FILE})
+        set_property(SOURCE ${FILE} PROPERTY MACOSX_PACKAGE_LOCATION "Resources/${FILE}")
+    endmacro()
+    #add_resource("${CMAKE_CURRENT_LIST_DIR}/src/Inter-VariableFont.ttf")
+    #add_resource("${CMAKE_CURRENT_LIST_DIR}/src/the_entertainer.ogg")
+    #add_resource("${CMAKE_CURRENT_LIST_DIR}/src/gs_tiger.svg")
 
-    # PRECHECKIN: using TARGET ${EXECUTABLE_NAME} wrong? copied from below but EXECUTABLE_NAME not referenced here
-    add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content ${MOBILE_ASSETS_DIR}/Content
-    )
+    foreach(item IN LISTS ASSETS_LIST)
+        #message(STATUS "Processing: ${item}")
+        #add_resource("${CMAKE_CURRENT_LIST_DIR}/src/Inter-VariableFont.ttf")
+        add_resource(${item})
+    endforeach()
 else()
-    add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Content $<TARGET_FILE_DIR:${EXECUTABLE_NAME}>/Content
-    )
+    if (ANDROID)
+        if (NOT MOBILE_ASSETS_DIR)
+            message(FATAL_ERROR "Building for Android, but MOBILE_ASSETS_DIR is not set")
+        endif()
+        file(MAKE_DIRECTORY "${MOBILE_ASSETS_DIR}")    # we need to create the project Assets dir otherwise CMake won't copy our assets.
+    endif()
+
+    
+    macro(copy_helper filename)
+        if (ANDROID)
+            # MOBILE_ASSETS_DIR is set in the gradle file via the cmake command line and points to the Android Studio Assets folder. 
+            # when we copy assets there, the Android build pipeline knows to add them to the apk. 
+            set(outname "${MOBILE_ASSETS_DIR}/${filename}")    
+        else()
+            # for platforms that do not have a good packaging format, all we can do is copy the assets to the process working directory.
+            set(outname "${CMAKE_BINARY_DIR}/$<CONFIGURATION>/${filename}")
+        endif()
+        add_custom_command(POST_BUILD
+            TARGET "${EXECUTABLE_NAME}"
+		#    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_LIST_DIR}/src/${filename}" "${outname}"
+		    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_LIST_DIR}/${filename}" "${outname}"
+	    )
+    endmacro()
+    #copy_helper("Inter-VariableFont.ttf")
+    #copy_helper("the_entertainer.ogg")
+    #copy_helper("gs_tiger.svg")
+    foreach(item IN LISTS ASSETS_LIST)
+        #message(STATUS "Processing: ${item}")
+        #add_resource("${CMAKE_CURRENT_LIST_DIR}/src/Inter-VariableFont.ttf")
+        copy_helper(${item})
+    endforeach()
 endif()
+
 
 # set some extra configs for each platform
 set(RESOURCE_FILES "Src/logo.png")
