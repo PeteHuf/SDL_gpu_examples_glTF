@@ -2,27 +2,24 @@
 #include <numeric>
 #include <memory>
 
-#if defined(_DEBUG) && defined(SDL_GLTF_DX_DEBUGGING)
-#include <Initguid.h>
-#include <dxgidebug.h> // For DXGIGetDebugInterface1 and IDXGIDebug1
-#include <dxgi1_3.h>
-
-#undef LoadImage
-#endif
-
 extern "C" {
 
 #include "Common.h"
 #include <SDL3/SDL_gpu.h>
 
-// // workaround for Debian build
-// #ifndef SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_NUMBER
-// #define SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_NUMBER SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_UINT8
-// #endif
-
 } // extern "C"
 
 #include "glTFModel.h"
+
+#if defined(_DEBUG) && defined(SDL_GLTF_DX_DEBUGGING)
+#include <Initguid.h>
+#include <dxgidebug.h> // For DXGIGetDebugInterface1 and IDXGIDebug1
+#include <dxgi1_3.h>
+#endif
+
+#if defined(LoadImage)
+#undef LoadImage
+#endif
 
 static SDL_GPUGraphicsPipeline* ScenePipeline;
 static SDL_GPUTexture* SceneDepthTexture;
@@ -39,13 +36,96 @@ struct SmartContext_t {
 	std::unique_ptr<vks::VulkanDevice> vulkanDevice{};
 	std::unique_ptr<vkglTF::Model> model{};
 
+	SDL_GPUTexture* flatNormalTexture{};
+
 	using IndexType = Uint32;
 	static constexpr SDL_GPUIndexElementSize index_element_size = SDL_GPU_INDEXELEMENTSIZE_32BIT;
 
 	vkglTF::BoundingBox aabb{};
+
+	~SmartContext_t()
+	{
+		if (flatNormalTexture != nullptr) {
+			//SDL_ReleaseGPUSampler(this->device->logicalDevice, sampler);
+			SDL_ReleaseGPUTexture(vulkanDevice->logicalDevice, flatNormalTexture);
+
+		}
+	}
 };
 
 static SmartContext_t* SmartContext = nullptr;
+
+static void init_flat_normal_texture(Context* context)
+{
+	// Load the image
+	SDL_Surface *imageData = LoadImage("flat_n.bmp", 4);
+	if (imageData == NULL)
+	{
+		SDL_Log("Could not load image data!");
+		return;
+	}
+
+	SDL_GPUTextureCreateInfo textureCreateInfo{
+		.type = SDL_GPU_TEXTURETYPE_2D,
+		.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+		.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
+		.width = static_cast<Uint32>(imageData->w),
+		.height = static_cast<Uint32>(imageData->h),
+		.layer_count_or_depth = 1,
+		.num_levels = 1
+	};
+	SmartContext->flatNormalTexture = SDL_CreateGPUTexture(context->Device, &textureCreateInfo);
+	SDL_SetGPUTextureName(
+		context->Device,
+		SmartContext->flatNormalTexture,
+		"Ravioli Texture 🖼️"
+	);
+
+
+	// Set up texture data
+	SDL_GPUTransferBufferCreateInfo transferBufferCreateInfo {
+		.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+		.size = static_cast<Uint32>(imageData->w * imageData->h * 4)
+	};
+	SDL_GPUTransferBuffer* textureTransferBuffer = SDL_CreateGPUTransferBuffer(
+		context->Device,
+		&transferBufferCreateInfo
+	);
+
+	Uint8* textureTransferPtr = static_cast<Uint8*>(SDL_MapGPUTransferBuffer(
+		context->Device,
+		textureTransferBuffer,
+		false
+	));
+	SDL_memcpy(textureTransferPtr, imageData->pixels, imageData->w * imageData->h * 4);
+	SDL_UnmapGPUTransferBuffer(context->Device, textureTransferBuffer);
+
+
+	// Upload the transfer data to the GPU resources
+	SDL_GPUCommandBuffer* uploadCmdBuf = SDL_AcquireGPUCommandBuffer(context->Device);
+	SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(uploadCmdBuf);
+
+	SDL_GPUTextureTransferInfo textureTransferInfo {
+		.transfer_buffer = textureTransferBuffer,
+		.offset = 0, /* Zeros out the rest */
+	};
+	SDL_GPUTextureRegion textureRegion{
+		.texture = SmartContext->flatNormalTexture,
+		.w = static_cast<Uint32>(imageData->w),
+		.h = static_cast<Uint32>(imageData->h),
+		.d = 1
+	};
+	SDL_UploadToGPUTexture(
+		copyPass,
+		&textureTransferInfo,
+		&textureRegion,
+		false
+	);
+
+	SDL_EndGPUCopyPass(copyPass);
+	SDL_SubmitGPUCommandBuffer(uploadCmdBuf);
+	SDL_DestroySurface(imageData);
+}
 
 static int Init_cpp(Context* context)
 {
@@ -220,10 +300,10 @@ static int Init_cpp(Context* context)
 		//SmartContext->model->loadFromFile(basePath + "Content/Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 		//SmartContext->model->loadFromFile(basePath + "Content/Models/Box/glTF-Embedded/Box.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 		//SmartContext->model->loadFromFile(basePath + "Content/Models/green_cube/glTF/green_cube.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
-		SmartContext->model->loadFromFile(basePath + "Content/Models/Dumpy_normals/glTF/dumpy_norm.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
+		//SmartContext->model->loadFromFile(basePath + "Content/Models/Dumpy_normals/glTF/dumpy_norm.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 
 		// PRECHECKIN: this one is broken currently due to the many assumptions about model structure
-		//SmartContext->model->loadFromFile(basePath + "Content/Models/Dumpy_bread/glTF/dump_bread_float.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
+		SmartContext->model->loadFromFile(basePath + "Content/Models/Dumpy_bread/glTF/dump_bread_float.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 
 
 
@@ -231,7 +311,7 @@ static int Init_cpp(Context* context)
 		SmartContext->aabb = vkglTF::BoundingBox(glm::vec3(-1), glm::vec3(1));
 
 
-
+		init_flat_normal_texture(context);
 
 
 		const std::array<float, 6> allSides{
@@ -337,6 +417,82 @@ struct alignas(16) MeshData {
 	alignas(16) MeshShaderDataBlock meshData;
 };
 
+static void render_node(const vkglTF::Node& curNode, const VertexUBO& vertexUBO, SDL_GPUTexture& swapchainTexture, float nearPlane, float farPlane, SDL_GPUCommandBuffer* cmdbuf)
+{
+	if (curNode.mesh != nullptr) {
+		MeshData meshData{};
+		meshData.meshData.matrix = curNode.mesh->matrix;
+		meshData.meshData.jointcount = curNode.mesh->jointcount;
+		SDL_memcpy(meshData.meshData.jointMatrix, curNode.mesh->jointMatrix, sizeof(curNode.mesh->jointMatrix));
+		static_assert(sizeof(meshData.meshData.jointMatrix) == sizeof(curNode.mesh->jointMatrix));
+
+
+		SDL_GPUDepthStencilTargetInfo depthStencilTargetInfo = { 0 };
+		depthStencilTargetInfo.texture = SceneDepthTexture;
+		depthStencilTargetInfo.cycle = true;
+		depthStencilTargetInfo.clear_depth = ClearDepth;
+		depthStencilTargetInfo.clear_stencil = ClearDepthStencil;
+		depthStencilTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
+		depthStencilTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
+		depthStencilTargetInfo.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
+		depthStencilTargetInfo.stencil_store_op = SDL_GPU_STOREOP_STORE;
+
+		SDL_PushGPUVertexUniformData(cmdbuf, 0, &vertexUBO, sizeof(vertexUBO));
+		SDL_PushGPUVertexUniformData(cmdbuf, 1, &meshData, sizeof(meshData));
+
+		std::array<float, 2> nearFarPlane{nearPlane, farPlane};
+		SDL_PushGPUFragmentUniformData(cmdbuf, 0, nearFarPlane.data(), 8);
+
+		// Render the object
+		SDL_GPUColorTargetInfo swapchainTargetInfo = { 0 };
+		swapchainTargetInfo.texture = &swapchainTexture;
+		swapchainTargetInfo.clear_color = ClearColor;
+		swapchainTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
+		swapchainTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
+
+		SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
+		SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
+
+
+		// NOTE: this is hacky and making assumptions about the model, look at https://github.com/SaschaWillems/Vulkan-glTF-PBR, VulkanApplication::renderNode for the proper way
+		for (const vkglTF::Material& material : SmartContext->model->materials) {
+			// look for the first material with a baseColorTexture
+			if (material.baseColorTexture == nullptr) {
+				continue;
+			}
+
+			enum class TextureIndex : size_t {
+				Colors = 0,
+				Normals = 1
+			};
+
+			std::array<SDL_GPUTextureSamplerBinding, 2> textureSamplerBindings{};
+			textureSamplerBindings.at(static_cast<size_t>(TextureIndex::Colors)) = SDL_GPUTextureSamplerBinding{ .texture = material.baseColorTexture->view, .sampler = material.baseColorTexture->sampler };
+			if (material.normalTexture != nullptr) {
+				textureSamplerBindings.at(static_cast<size_t>(TextureIndex::Normals)) = SDL_GPUTextureSamplerBinding{ .texture = material.normalTexture->view, .sampler = material.normalTexture->sampler };
+			}
+			else {
+				textureSamplerBindings.at(static_cast<size_t>(TextureIndex::Normals)) = SDL_GPUTextureSamplerBinding{ .texture = SmartContext->flatNormalTexture, .sampler = material.baseColorTexture->sampler };
+			}
+
+			SDL_BindGPUFragmentSamplers(renderPass, 0, textureSamplerBindings.data(), static_cast<Uint32>(textureSamplerBindings.size()));
+
+			SmartContext->model->draw(renderPass);
+
+			// hacky, rendering everything with the first material which has a baseColorTexture
+			break;
+		}
+
+		SDL_EndGPURenderPass(renderPass);
+	}
+
+	for (const auto& child : curNode.children) {
+		if (child != nullptr) {
+			render_node(*child, vertexUBO, swapchainTexture, nearPlane, farPlane, cmdbuf);
+		}
+	}
+}
+
 static int Draw_cpp(Context* context)
 {
 	SDL_GPUCommandBuffer* cmdbuf = SDL_AcquireGPUCommandBuffer(context->Device);
@@ -391,72 +547,78 @@ static int Draw_cpp(Context* context)
 		);
 #endif
 
-
-		vkglTF::Node* curNode = SmartContext->model->nodes.at(0)->children.at(0); // PRECHECKIN: how to get the real one?
-
-		MeshData meshData{};
-		meshData.meshData.matrix = curNode->mesh->matrix;
-		meshData.meshData.jointcount = curNode->mesh->jointcount;
-		SDL_memcpy(meshData.meshData.jointMatrix, curNode->mesh->jointMatrix, sizeof(curNode->mesh->jointMatrix));
-		static_assert(sizeof(meshData.meshData.jointMatrix) == sizeof(curNode->mesh->jointMatrix));
-
-
-		SDL_GPUDepthStencilTargetInfo depthStencilTargetInfo = { 0 };
-		depthStencilTargetInfo.texture = SceneDepthTexture;
-		depthStencilTargetInfo.cycle = true;
-		depthStencilTargetInfo.clear_depth = ClearDepth;
-		depthStencilTargetInfo.clear_stencil = ClearDepthStencil;
-		depthStencilTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
-		depthStencilTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
-		depthStencilTargetInfo.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
-		depthStencilTargetInfo.stencil_store_op = SDL_GPU_STOREOP_STORE;
-
-		SDL_PushGPUVertexUniformData(cmdbuf, 0, &vertexUBO, sizeof(vertexUBO));
-		SDL_PushGPUVertexUniformData(cmdbuf, 1, &meshData, sizeof(meshData));
-
-		std::array<float, 2> nearFarPlane{nearPlane, farPlane};
-		SDL_PushGPUFragmentUniformData(cmdbuf, 0, nearFarPlane.data(), 8);
-
-		// Render the object
-		SDL_GPUColorTargetInfo swapchainTargetInfo = { 0 };
-		swapchainTargetInfo.texture = swapchainTexture;
-		swapchainTargetInfo.clear_color = ClearColor;
-		swapchainTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
-		swapchainTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
-
-
-
-
-
-		SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
-		SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
-
-
-		// NOTE: this is hacky and making assumptions about the model, look at https://github.com/SaschaWillems/Vulkan-glTF-PBR, VulkanApplication::renderNode for the proper way
-		for (const vkglTF::Material& material : SmartContext->model->materials) {
-			// look for the first material with a baseColorTexture
-			if (material.baseColorTexture == nullptr) {
-				continue;
+		for (const auto& child : SmartContext->model->nodes) {
+			if (child != nullptr) {
+				render_node(*child, vertexUBO, *swapchainTexture, nearPlane, farPlane, cmdbuf);
 			}
-
-			enum class TextureIndex : size_t {
-				Colors = 0,
-				Normals = 1
-			};
-
-			std::array<SDL_GPUTextureSamplerBinding, 2> textureSamplerBindings{};
-			textureSamplerBindings.at(static_cast<size_t>(TextureIndex::Colors)) = SDL_GPUTextureSamplerBinding{ .texture = material.baseColorTexture->view, .sampler = material.baseColorTexture->sampler };
-			textureSamplerBindings.at(static_cast<size_t>(TextureIndex::Normals)) = SDL_GPUTextureSamplerBinding{ .texture = material.normalTexture->view, .sampler = material.normalTexture->sampler };
-
-			SDL_BindGPUFragmentSamplers(renderPass, 0, textureSamplerBindings.data(), static_cast<Uint32>(textureSamplerBindings.size()));
-
-			SmartContext->model->draw(renderPass);
-
-			// hacky, rendering everything with the first material which has a baseColorTexture
-			break;
 		}
 
-		SDL_EndGPURenderPass(renderPass);
+
+		//vkglTF::Node* curNode = SmartContext->model->nodes.at(0)->children.at(0); // PRECHECKIN: how to get the real one?
+
+		//MeshData meshData{};
+		//meshData.meshData.matrix = curNode->mesh->matrix;
+		//meshData.meshData.jointcount = curNode->mesh->jointcount;
+		//SDL_memcpy(meshData.meshData.jointMatrix, curNode->mesh->jointMatrix, sizeof(curNode->mesh->jointMatrix)); // PRECHECKIN: cleanup
+		//static_assert(sizeof(meshData.meshData.jointMatrix) == sizeof(curNode->mesh->jointMatrix));
+
+
+		//SDL_GPUDepthStencilTargetInfo depthStencilTargetInfo = { 0 };
+		//depthStencilTargetInfo.texture = SceneDepthTexture;
+		//depthStencilTargetInfo.cycle = true;
+		//depthStencilTargetInfo.clear_depth = ClearDepth;
+		//depthStencilTargetInfo.clear_stencil = ClearDepthStencil;
+		//depthStencilTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
+		//depthStencilTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
+		//depthStencilTargetInfo.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
+		//depthStencilTargetInfo.stencil_store_op = SDL_GPU_STOREOP_STORE;
+
+		//SDL_PushGPUVertexUniformData(cmdbuf, 0, &vertexUBO, sizeof(vertexUBO));
+		//SDL_PushGPUVertexUniformData(cmdbuf, 1, &meshData, sizeof(meshData));
+
+		//std::array<float, 2> nearFarPlane{nearPlane, farPlane};
+		//SDL_PushGPUFragmentUniformData(cmdbuf, 0, nearFarPlane.data(), 8);
+
+		//// Render the object
+		//SDL_GPUColorTargetInfo swapchainTargetInfo = { 0 };
+		//swapchainTargetInfo.texture = swapchainTexture;
+		//swapchainTargetInfo.clear_color = ClearColor;
+		//swapchainTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
+		//swapchainTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
+
+
+
+
+
+		//SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
+		//SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
+
+
+		//// NOTE: this is hacky and making assumptions about the model, look at https://github.com/SaschaWillems/Vulkan-glTF-PBR, VulkanApplication::renderNode for the proper way
+		//for (const vkglTF::Material& material : SmartContext->model->materials) {
+		//	// look for the first material with a baseColorTexture
+		//	if (material.baseColorTexture == nullptr) {
+		//		continue;
+		//	}
+
+		//	enum class TextureIndex : size_t {
+		//		Colors = 0,
+		//		Normals = 1
+		//	};
+
+		//	std::array<SDL_GPUTextureSamplerBinding, 2> textureSamplerBindings{};
+		//	textureSamplerBindings.at(static_cast<size_t>(TextureIndex::Colors)) = SDL_GPUTextureSamplerBinding{ .texture = material.baseColorTexture->view, .sampler = material.baseColorTexture->sampler };
+		//	textureSamplerBindings.at(static_cast<size_t>(TextureIndex::Normals)) = SDL_GPUTextureSamplerBinding{ .texture = material.normalTexture->view, .sampler = material.normalTexture->sampler };
+
+		//	SDL_BindGPUFragmentSamplers(renderPass, 0, textureSamplerBindings.data(), static_cast<Uint32>(textureSamplerBindings.size()));
+
+		//	SmartContext->model->draw(renderPass);
+
+		//	// hacky, rendering everything with the first material which has a baseColorTexture
+		//	break;
+		//}
+
+		//SDL_EndGPURenderPass(renderPass);
 	}
 
 	SDL_SubmitGPUCommandBuffer(cmdbuf);

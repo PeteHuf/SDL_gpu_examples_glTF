@@ -15,6 +15,7 @@ list(APPEND ASSETS_LIST
 	${relative_path}/cube3mip1.bmp
 	${relative_path}/cube4.bmp
 	${relative_path}/cube5.bmp
+	${relative_path}/flat_n.bmp
 	${relative_path}/latency.bmp
 	${relative_path}/memorial.hdr
 	${relative_path}/ravioli.bmp
