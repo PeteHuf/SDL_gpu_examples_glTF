@@ -417,45 +417,79 @@ struct alignas(16) MeshData {
 	alignas(16) MeshShaderDataBlock meshData;
 };
 
-static void render_node(const vkglTF::Node& curNode, const VertexUBO& vertexUBO, SDL_GPUTexture& swapchainTexture, float nearPlane, float farPlane, SDL_GPUCommandBuffer* cmdbuf)
+static void render_node(const vkglTF::Node& curNode, const VertexUBO& vertexUBO, SDL_GPUTexture& swapchainTexture, SDL_GPURenderPass* renderPass, float nearPlane, float farPlane, SDL_GPUCommandBuffer* cmdbuf)
 {
 	if (curNode.mesh != nullptr) {
-		MeshData meshData{};
-		meshData.meshData.matrix = curNode.mesh->matrix;
-		meshData.meshData.jointcount = curNode.mesh->jointcount;
-		SDL_memcpy(meshData.meshData.jointMatrix, curNode.mesh->jointMatrix, sizeof(curNode.mesh->jointMatrix));
-		static_assert(sizeof(meshData.meshData.jointMatrix) == sizeof(curNode.mesh->jointMatrix));
+		for (vkglTF::Primitive * primitive : curNode.mesh->primitives) {
+			//if (primitive->material.alphaMode == alphaMode) {
+				//std::string pipelineName = "pbr";
+				//std::string pipelineVariant = "";
+
+				//if (primitive->material.unlit) {
+				//	// KHR_materials_unlit
+				//	pipelineName = "unlit";
+				//};
+
+				//// Material properties define if we e.g. need to bind a pipeline variant with culling disabled (double sided)
+				//if (alphaMode == vkglTF::Material::ALPHAMODE_BLEND) {
+				//	pipelineVariant = "_alpha_blending";
+				//} else {
+				//	if (primitive->material.doubleSided) {
+				//		pipelineVariant = "_double_sided";
+				//	}
+				//}
+
+				//const VkPipeline pipeline = pipelines[pipelineName + pipelineVariant];
+
+				//if (pipeline != boundPipeline) {
+				//	vkCmdBindPipeline(commandBuffers[cbIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+				//	boundPipeline = pipeline;
+				//}
+
+				//const std::vector<VkDescriptorSet> descriptorsets = {
+				//	descriptorSets[cbIndex].scene,
+				//	primitive->material.descriptorSet,
+				//	// @todo: per frame-in-flight
+				//	descriptorSetsMeshData[cbIndex],
+				//	descriptorSetMaterials
+				//};
+				//vkCmdBindDescriptorSets(commandBuffers[cbIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, static_cast<uint32_t>(descriptorsets.size()), descriptorsets.data(), 0, NULL);
+
+				//// Pass material index for this primitive using a push constant, the shader uses this to index into the material buffer
+				//MeshPushConstantBlock pushConstantBlock{};
+				//// @todo: index
+				//pushConstantBlock.meshIndex = node->mesh->index;
+				//pushConstantBlock.materialIndex = primitive->material.index;
+				//vkCmdPushConstants(commandBuffers[cbIndex], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(MeshPushConstantBlock), &pushConstantBlock);
+
+				//if (primitive->hasIndices) {
+				//	vkCmdDrawIndexed(commandBuffers[cbIndex], primitive->indexCount, 1, primitive->firstIndex, 0, 0);
+				//} else {
+				//	vkCmdDraw(commandBuffers[cbIndex], primitive->vertexCount, 1, 0, 0);
+				//}
+			//}
 
 
-		SDL_GPUDepthStencilTargetInfo depthStencilTargetInfo = { 0 };
-		depthStencilTargetInfo.texture = SceneDepthTexture;
-		depthStencilTargetInfo.cycle = true;
-		depthStencilTargetInfo.clear_depth = ClearDepth;
-		depthStencilTargetInfo.clear_stencil = ClearDepthStencil;
-		depthStencilTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
-		depthStencilTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
-		depthStencilTargetInfo.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
-		depthStencilTargetInfo.stencil_store_op = SDL_GPU_STOREOP_STORE;
 
-		SDL_PushGPUVertexUniformData(cmdbuf, 0, &vertexUBO, sizeof(vertexUBO));
-		SDL_PushGPUVertexUniformData(cmdbuf, 1, &meshData, sizeof(meshData));
-
-		std::array<float, 2> nearFarPlane{nearPlane, farPlane};
-		SDL_PushGPUFragmentUniformData(cmdbuf, 0, nearFarPlane.data(), 8);
-
-		// Render the object
-		SDL_GPUColorTargetInfo swapchainTargetInfo = { 0 };
-		swapchainTargetInfo.texture = &swapchainTexture;
-		swapchainTargetInfo.clear_color = ClearColor;
-		swapchainTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
-		swapchainTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
-
-		SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
-		SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
+			MeshData meshData{};
+			meshData.meshData.matrix = curNode.mesh->matrix;
+			meshData.meshData.jointcount = curNode.mesh->jointcount;
+			SDL_memcpy(meshData.meshData.jointMatrix, curNode.mesh->jointMatrix, sizeof(curNode.mesh->jointMatrix));
+			static_assert(sizeof(meshData.meshData.jointMatrix) == sizeof(curNode.mesh->jointMatrix));
 
 
-		// NOTE: this is hacky and making assumptions about the model, look at https://github.com/SaschaWillems/Vulkan-glTF-PBR, VulkanApplication::renderNode for the proper way
-		for (const vkglTF::Material& material : SmartContext->model->materials) {
+			SDL_PushGPUVertexUniformData(cmdbuf, 0, &vertexUBO, sizeof(vertexUBO));
+			SDL_PushGPUVertexUniformData(cmdbuf, 1, &meshData, sizeof(meshData));
+
+			std::array<float, 2> nearFarPlane{nearPlane, farPlane};
+			SDL_PushGPUFragmentUniformData(cmdbuf, 0, nearFarPlane.data(), 8);
+
+
+			
+
+			// NOTE: this is hacky and making assumptions about the model, look at https://github.com/SaschaWillems/Vulkan-glTF-PBR, VulkanApplication::renderNode for the proper way
+			vkglTF::Material& material = primitive->material;
+
 			// look for the first material with a baseColorTexture
 			if (material.baseColorTexture == nullptr) {
 				continue;
@@ -477,18 +511,75 @@ static void render_node(const vkglTF::Node& curNode, const VertexUBO& vertexUBO,
 
 			SDL_BindGPUFragmentSamplers(renderPass, 0, textureSamplerBindings.data(), static_cast<Uint32>(textureSamplerBindings.size()));
 
-			SmartContext->model->draw(renderPass);
+			//SmartContext->model->draw(renderPass);
 
-			// hacky, rendering everything with the first material which has a baseColorTexture
-			break;
+			SDL_GPUBufferBinding buffBinding{ .buffer = SmartContext->model->vertices.buffer, .offset = 0 };
+			SDL_GPUBufferBinding indBinding{ .buffer = SmartContext->model->indices.buffer, .offset = 0 };
+
+			SDL_BindGPUVertexBuffers(renderPass, 0, &buffBinding, 1);
+			SDL_BindGPUIndexBuffer(renderPass, &indBinding, SDL_GPU_INDEXELEMENTSIZE_32BIT);
+
+			SDL_DrawGPUIndexedPrimitives(renderPass, primitive->indexCount, 1, primitive->firstIndex, 0, 0);
+
+			//for (auto& node : SmartContext->model->nodes) {
+			//	SmartContext->model->drawNode(node, /*commandBuffer*/ renderPass);
+			//}
+
+
+
 		}
 
-		SDL_EndGPURenderPass(renderPass);
+
+
+
+
+		//MeshData meshData{};
+		//meshData.meshData.matrix = curNode.mesh->matrix;
+		//meshData.meshData.jointcount = curNode.mesh->jointcount;
+		//SDL_memcpy(meshData.meshData.jointMatrix, curNode.mesh->jointMatrix, sizeof(curNode.mesh->jointMatrix));
+		//static_assert(sizeof(meshData.meshData.jointMatrix) == sizeof(curNode.mesh->jointMatrix));
+
+
+		//SDL_PushGPUVertexUniformData(cmdbuf, 0, &vertexUBO, sizeof(vertexUBO));
+		//SDL_PushGPUVertexUniformData(cmdbuf, 1, &meshData, sizeof(meshData));
+
+		//std::array<float, 2> nearFarPlane{nearPlane, farPlane};
+		//SDL_PushGPUFragmentUniformData(cmdbuf, 0, nearFarPlane.data(), 8);
+
+
+		//// NOTE: this is hacky and making assumptions about the model, look at https://github.com/SaschaWillems/Vulkan-glTF-PBR, VulkanApplication::renderNode for the proper way
+		//for (const vkglTF::Material& material : SmartContext->model->materials) {
+		//	// look for the first material with a baseColorTexture
+		//	if (material.baseColorTexture == nullptr) {
+		//		continue;
+		//	}
+
+		//	enum class TextureIndex : size_t {
+		//		Colors = 0,
+		//		Normals = 1
+		//	};
+
+		//	std::array<SDL_GPUTextureSamplerBinding, 2> textureSamplerBindings{};
+		//	textureSamplerBindings.at(static_cast<size_t>(TextureIndex::Colors)) = SDL_GPUTextureSamplerBinding{ .texture = material.baseColorTexture->view, .sampler = material.baseColorTexture->sampler };
+		//	if (material.normalTexture != nullptr) {
+		//		textureSamplerBindings.at(static_cast<size_t>(TextureIndex::Normals)) = SDL_GPUTextureSamplerBinding{ .texture = material.normalTexture->view, .sampler = material.normalTexture->sampler };
+		//	}
+		//	else {
+		//		textureSamplerBindings.at(static_cast<size_t>(TextureIndex::Normals)) = SDL_GPUTextureSamplerBinding{ .texture = SmartContext->flatNormalTexture, .sampler = material.baseColorTexture->sampler };
+		//	}
+
+		//	SDL_BindGPUFragmentSamplers(renderPass, 0, textureSamplerBindings.data(), static_cast<Uint32>(textureSamplerBindings.size()));
+
+		//	SmartContext->model->draw(renderPass);
+
+		//	// hacky, rendering everything with the first material which has a baseColorTexture
+		//	break;
+		//}
 	}
 
 	for (const auto& child : curNode.children) {
 		if (child != nullptr) {
-			render_node(*child, vertexUBO, swapchainTexture, nearPlane, farPlane, cmdbuf);
+			render_node(*child, vertexUBO, swapchainTexture, renderPass, nearPlane, farPlane, cmdbuf);
 		}
 	}
 }
@@ -508,8 +599,10 @@ static int Draw_cpp(Context* context)
 		return -1;
 	}
 
-	if (swapchainTexture != nullptr)
-	{
+	if (swapchainTexture == nullptr) {
+		SDL_SubmitGPUCommandBuffer(cmdbuf);
+	}
+	else {
 		// Render the 3D Scene (Color and Depth pass)
 		float nearPlane = 20.0f;
 		float farPlane = 60.0f;
@@ -547,11 +640,38 @@ static int Draw_cpp(Context* context)
 		);
 #endif
 
+
+
+
+		SDL_GPUDepthStencilTargetInfo depthStencilTargetInfo = { 0 };
+		depthStencilTargetInfo.texture = SceneDepthTexture;
+		depthStencilTargetInfo.cycle = true;
+		depthStencilTargetInfo.clear_depth = ClearDepth;
+		depthStencilTargetInfo.clear_stencil = ClearDepthStencil;
+		depthStencilTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
+		depthStencilTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
+		depthStencilTargetInfo.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
+		depthStencilTargetInfo.stencil_store_op = SDL_GPU_STOREOP_STORE;
+
+		// Render the object
+		SDL_GPUColorTargetInfo swapchainTargetInfo = { 0 };
+		swapchainTargetInfo.texture = swapchainTexture;
+		swapchainTargetInfo.clear_color = ClearColor;
+		swapchainTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
+		swapchainTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
+
+		SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
+		SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
+
 		for (const auto& child : SmartContext->model->nodes) {
 			if (child != nullptr) {
-				render_node(*child, vertexUBO, *swapchainTexture, nearPlane, farPlane, cmdbuf);
+				render_node(*child, vertexUBO, *swapchainTexture, renderPass, nearPlane, farPlane, cmdbuf);
 			}
 		}
+
+		SDL_EndGPURenderPass(renderPass);
+
+		SDL_SubmitGPUCommandBuffer(cmdbuf);
 
 
 		//vkglTF::Node* curNode = SmartContext->model->nodes.at(0)->children.at(0); // PRECHECKIN: how to get the real one?
@@ -619,9 +739,8 @@ static int Draw_cpp(Context* context)
 		//}
 
 		//SDL_EndGPURenderPass(renderPass);
+		//SDL_SubmitGPUCommandBuffer(cmdbuf);
 	}
-
-	SDL_SubmitGPUCommandBuffer(cmdbuf);
 
 	return 0;
 }
