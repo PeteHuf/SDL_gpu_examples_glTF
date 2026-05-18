@@ -15,6 +15,8 @@ extern "C" {
 #include <Initguid.h>
 #include <dxgidebug.h> // For DXGIGetDebugInterface1 and IDXGIDebug1
 #include <dxgi1_3.h>
+#undef min
+#undef max
 #endif
 
 #if defined(LoadImage)
@@ -124,6 +126,7 @@ static void init_flat_normal_texture(Context* context)
 
 	SDL_EndGPUCopyPass(copyPass);
 	SDL_SubmitGPUCommandBuffer(uploadCmdBuf);
+	SDL_ReleaseGPUTransferBuffer(context->Device, textureTransferBuffer);
 	SDL_DestroySurface(imageData);
 }
 
