@@ -417,7 +417,7 @@ struct alignas(16) MeshData {
 	alignas(16) MeshShaderDataBlock meshData;
 };
 
-static void render_node(const vkglTF::Node& curNode, const VertexUBO& vertexUBO, SDL_GPUTexture& swapchainTexture, SDL_GPURenderPass* renderPass, float nearPlane, float farPlane, SDL_GPUCommandBuffer* cmdbuf)
+static void render_node(vkglTF::Node& curNode, const VertexUBO& vertexUBO, SDL_GPUTexture& swapchainTexture, SDL_GPURenderPass* renderPass, float nearPlane, float farPlane, SDL_GPUCommandBuffer* cmdbuf)
 {
 	if (curNode.mesh != nullptr) {
 		for (vkglTF::Primitive * primitive : curNode.mesh->primitives) {
@@ -472,7 +472,8 @@ static void render_node(const vkglTF::Node& curNode, const VertexUBO& vertexUBO,
 
 
 			MeshData meshData{};
-			meshData.meshData.matrix = curNode.mesh->matrix;
+			meshData.meshData.matrix = curNode.mesh->matrix; // PRECHECKIN: eval
+			//meshData.meshData.matrix = curNode.getMatrix();
 			meshData.meshData.jointcount = curNode.mesh->jointcount;
 			SDL_memcpy(meshData.meshData.jointMatrix, curNode.mesh->jointMatrix, sizeof(curNode.mesh->jointMatrix));
 			static_assert(sizeof(meshData.meshData.jointMatrix) == sizeof(curNode.mesh->jointMatrix));

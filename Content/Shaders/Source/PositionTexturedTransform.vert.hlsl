@@ -63,11 +63,13 @@ Output main(Input input)
         //output.Position = mul(mul(mul(model, meshData.mat), skinMat), float4(input.Position, 1.0));
         //outNormal = normalize(transpose(inverse(mat3(model * meshData.mat * skinMat))) * input.Normal);
     }
-    //else
-    //{
-    //    locPos = model * meshData.mat * float4(input.Position, 1.0);
-    //    //outNormal = normalize(transpose(inverse(mat3(model * meshData.mat))) * input.Normal);
-    //}
+    else
+    {
+        output.Position = mul(mul(transform, meshData.mat), float4(input.Position, 1.0));
+        //locPos = model * meshData.mat * float4(input.Position, 1.0);
+        
+        //outNormal = normalize(transpose(inverse(mat3(model * meshData.mat))) * input.Normal);
+    }
     
     
     
