@@ -62,22 +62,10 @@ namespace vkglTF
 	}
 
 	// Texture
-	void Texture::updateDescriptor()
-	{
-		// descriptor.sampler = sampler;
-		// descriptor.imageView = view;
-		// descriptor.imageLayout = imageLayout;
-	}
-
 	void Texture::destroy()
 	{
 		SDL_ReleaseGPUSampler(this->device->logicalDevice, sampler);
 		SDL_ReleaseGPUTexture(this->device->logicalDevice, view);
-
-		// vkDestroyImageView(device->logicalDevice, view, nullptr);
-		// vkDestroyImage(device->logicalDevice, image, nullptr);
-		// vkFreeMemory(device->logicalDevice, deviceMemory, nullptr);
-		// vkDestroySampler(device->logicalDevice, sampler, nullptr);
 	}
 
 	// Loads the image for this texture. Supports both glTF's web formats (jpg, png, embedded and external files) as well as external KTX2 files with basis universal texture compression
@@ -95,208 +83,13 @@ namespace vkglTF
 		
 		SDL_GPUTextureFormat format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
 
-		//if (isKtx2) {
-		//	// Image is KTX2 using basis universal compression. Those images need to be loaded from disk and will be transcoded to a native GPU format
-		//
-		//	basist::ktx2_transcoder ktxTranscoder;
-		//	const std::string filename = path + "\\" + gltfimage.uri;
-		//	std::ifstream ifs(filename, std::ios::binary | std::ios::in | std::ios::ate);
-		//	if (!ifs.is_open()) {
-		//		throw std::runtime_error("Could not load the requested image file " + filename);
-		//	}
-		//
-		//	uint32_t inputDataSize = static_cast<uint32_t>(ifs.tellg());
-		//	char* inputData = new char[inputDataSize];
-		//
-		//	ifs.seekg(0, std::ios::beg);
-		//	ifs.read(inputData, inputDataSize);
-		//
-		//	bool success = ktxTranscoder.init(inputData, inputDataSize);
-		//	if (!success) {
-		//		throw std::runtime_error("Could not initialize ktx2 transcoder for image file " + filename);
-		//	}
-		//
-		//	// Select target format based on device features (use uncompressed if none supported)
-		//	auto targetFormat = basist::transcoder_texture_format::cTFRGBA32;
-		//
-		//	auto formatSupported = [device](VkFormat format) {
-		//		VkFormatProperties formatProperties;
-		//		vkGetPhysicalDeviceFormatProperties(device->physicalDevice, format, &formatProperties);
-		//		return ((formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_TRANSFER_DST_BIT) && (formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT));
-		//	};
-		//
-		//	if (device->features.textureCompressionBC) {
-		//		// BC7 is the preferred block compression if available
-		//		if (formatSupported(VK_FORMAT_BC7_UNORM_BLOCK)) {
-		//			targetFormat = basist::transcoder_texture_format::cTFBC7_RGBA;
-		//			format = VK_FORMAT_BC7_UNORM_BLOCK;
-		//		} else {
-		//			if (formatSupported(VK_FORMAT_BC3_SRGB_BLOCK)) {
-		//				targetFormat = basist::transcoder_texture_format::cTFBC3_RGBA;
-		//				format = VK_FORMAT_BC3_SRGB_BLOCK;
-		//			}
-		//		}
-		//	}
-		//	// Adaptive scalable texture compression
-		//	if (device->features.textureCompressionASTC_LDR) {
-		//		if (formatSupported(VK_FORMAT_ASTC_4x4_SRGB_BLOCK))
-		//		{
-		//			targetFormat = basist::transcoder_texture_format::cTFASTC_4x4_RGBA;
-		//			format = VK_FORMAT_ASTC_4x4_SRGB_BLOCK;
-		//		}
-		//	}
-		//	// Ericsson texture compression
-		//	if (device->features.textureCompressionETC2) {
-		//		if (formatSupported(VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK))
-		//		{
-		//			targetFormat = basist::transcoder_texture_format::cTFETC2_RGBA;
-		//			format = VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK;
-		//		}
-		//	}
-		//
-		//	// @todo PowerVR texture compression support needs to be checked via an extension (VK_IMG_FORMAT_PVRTC_EXTENSION_NAME)
-		//
-		//	const bool targetFormatIsUncompressed = basist::basis_transcoder_format_is_uncompressed(targetFormat);
-		//
-		//	std::vector<basist::ktx2_image_level_info> levelInfos(ktxTranscoder.get_levels());
-		//	mipLevels = ktxTranscoder.get_levels();
-		//
-		//	// Query image level information that we need later on for several calculations
-		//	// We only support 2D images (no cube maps or layered images)
-		//	for (uint32_t i = 0; i < mipLevels; i++) {
-		//		ktxTranscoder.get_image_level_info(levelInfos[i], i, 0, 0);
-		//	}
-		//
-		//	width = levelInfos[0].m_orig_width;
-		//	height = levelInfos[0].m_orig_height;
-		//
-		//	VkMemoryAllocateInfo memAllocInfo{};
-		//	memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		//	VkMemoryRequirements memReqs{};
-		//
-		//	// Create one staging buffer large enough to hold all uncompressed image levels
-		//	const uint32_t bytesPerBlockOrPixel = basist::basis_get_bytes_per_block_or_pixel(targetFormat);
-		//	uint32_t numBlocksOrPixels = 0;
-		//	VkDeviceSize totalBufferSize = 0;
-		//	for (uint32_t i = 0; i < mipLevels; i++) {
-		//		// Size calculations differ for compressed/uncompressed formats
-		//		numBlocksOrPixels = targetFormatIsUncompressed ? levelInfos[i].m_orig_width * levelInfos[i].m_orig_height : levelInfos[i].m_total_blocks;
-		//		totalBufferSize += numBlocksOrPixels * bytesPerBlockOrPixel;
-		//	}
-		//
-		//	SDL_GPUBuffer* stagingBuffer;
-		//	VkDeviceMemory stagingMemory;
-		//	VkBufferCreateInfo bufferCreateInfo{};
-		//	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		//	bufferCreateInfo.size = totalBufferSize;
-		//	bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-		//	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		//	VK_CHECK_RESULT(vkCreateBuffer(device->logicalDevice, &bufferCreateInfo, nullptr, &stagingBuffer));
-		//	vkGetBufferMemoryRequirements(device->logicalDevice, stagingBuffer, &memReqs);
-		//	memAllocInfo.allocationSize = memReqs.size;
-		//	memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-		//	VK_CHECK_RESULT(vkAllocateMemory(device->logicalDevice, &memAllocInfo, nullptr, &stagingMemory));
-		//	VK_CHECK_RESULT(vkBindBufferMemory(device->logicalDevice, stagingBuffer, stagingMemory, 0));
-		//	uint8_t* stagingBufferMapped;
-		//	VK_CHECK_RESULT(vkMapMemory(device->logicalDevice, stagingMemory, 0, memReqs.size, 0, (void**)&stagingBufferMapped));
-		//
-		//	unsigned char* buffer = new unsigned char[totalBufferSize];
-		//	unsigned char* bufferPtr = &buffer[0];
-		//
-		//	success = ktxTranscoder.start_transcoding();
-		//	if (!success) {
-		//		throw std::runtime_error("Could not start transcoding for image file " + filename);
-		//	}
-		//
-		//	// Transcode all mip levels into the staging buffer
-		//	for (uint32_t i = 0; i < mipLevels; i++) {
-		//		// Size calculations differ for compressed/uncompressed formats
-		//		numBlocksOrPixels = targetFormatIsUncompressed ? levelInfos[i].m_orig_width * levelInfos[i].m_orig_height : levelInfos[i].m_total_blocks;
-		//		uint32_t outputSize = numBlocksOrPixels * bytesPerBlockOrPixel;
-		//		if (!ktxTranscoder.transcode_image_level(i, 0, 0, bufferPtr, numBlocksOrPixels, targetFormat, 0)) {
-		//			throw std::runtime_error("Could not transcode the requested image file " + filename);
-		//		}
-		//		bufferPtr += outputSize;
-		//	}
-		//
-		//	memcpy(stagingBufferMapped, buffer, totalBufferSize);
-		//
-		//	VkImageCreateInfo imageCreateInfo{};
-		//	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		//	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-		//	imageCreateInfo.format = format;
-		//	imageCreateInfo.mipLevels = mipLevels;
-		//	imageCreateInfo.arrayLayers = 1;
-		//	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		//	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		//	imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-		//	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		//	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		//	imageCreateInfo.extent = { width, height, 1 };
-		//	imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		//	VK_CHECK_RESULT(vkCreateImage(device->logicalDevice, &imageCreateInfo, nullptr, &image));
-		//	vkGetImageMemoryRequirements(device->logicalDevice, image, &memReqs);
-		//	memAllocInfo.allocationSize = memReqs.size;
-		//	memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		//	VK_CHECK_RESULT(vkAllocateMemory(device->logicalDevice, &memAllocInfo, nullptr, &deviceMemory));
-		//	VK_CHECK_RESULT(vkBindImageMemory(device->logicalDevice, image, deviceMemory, 0));
-		//
-		//	SDL_GPUCommandBuffer* copyCmd = device->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
-		//
-		//	VkImageSubresourceRange subresourceRange = {};
-		//	subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		//	subresourceRange.levelCount = mipLevels;
-		//	subresourceRange.layerCount = 1;
-		//
-		//	VkImageMemoryBarrier imageMemoryBarrier{};
-		//	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		//	imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		//	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		//	imageMemoryBarrier.srcAccessMask = 0;
-		//	imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		//	imageMemoryBarrier.image = image;
-		//	imageMemoryBarrier.subresourceRange = subresourceRange;
-		//	vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
-		//
-		//	// Transcode and copy all image levels
-		//	VkDeviceSize bufferOffset = 0;
-		//	for (uint32_t i = 0; i < mipLevels; i++) {
-		//		// Size calculations differ for compressed/uncompressed formats
-		//		numBlocksOrPixels = targetFormatIsUncompressed ? levelInfos[i].m_orig_width * levelInfos[i].m_orig_height : levelInfos[i].m_total_blocks;
-		//		uint32_t outputSize = numBlocksOrPixels * bytesPerBlockOrPixel;
-		//
-		//		VkBufferImageCopy bufferCopyRegion = {};
-		//		bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		//		bufferCopyRegion.imageSubresource.mipLevel = i;
-		//		bufferCopyRegion.imageSubresource.baseArrayLayer = 0;
-		//		bufferCopyRegion.imageSubresource.layerCount = 1;
-		//		bufferCopyRegion.imageExtent.width = levelInfos[i].m_orig_width;
-		//		bufferCopyRegion.imageExtent.height = levelInfos[i].m_orig_height;
-		//		bufferCopyRegion.imageExtent.depth = 1;
-		//		bufferCopyRegion.bufferOffset = bufferOffset;
-		//
-		//		vkCmdCopyBufferToImage(copyCmd, stagingBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferCopyRegion);
-		//
-		//		bufferOffset += outputSize;
-		//	}
-		//
-		//	imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		//	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-		//	imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		//	imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-		//	imageMemoryBarrier.image = image;
-		//	imageMemoryBarrier.subresourceRange = subresourceRange;
-		//	vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
-		//
-		//	device->flushCommandBuffer(copyCmd, copyQueue, true);
-		//
-		//	vkFreeMemory(device->logicalDevice, stagingMemory, nullptr);
-		//	vkDestroyBuffer(device->logicalDevice, stagingBuffer, nullptr);
-		//
-		//	delete[] buffer;
-		//	delete[] inputData;
-		//}
-		//else
+		if (isKtx2) {
+			// Image is KTX2 using basis universal compression. Those images need to be loaded from disk and will be transcoded to a native GPU format
+		
+			assert(false); // unimplemented in this sample
+			std::terminate();
+		}
+		else
 		{
 			// Image is a basic glTF format like png or jpg and can be loaded directly via tinyglTF
 			unsigned char* buffer = nullptr;
@@ -325,7 +118,7 @@ namespace vkglTF
 		
 			// PNG supports up to 64 bits
 			if (gltfimage.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
-				assert(false); // PRECHECKIN: untested
+				assert(false); // NOTE: untested, maybe correct?
 				format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_UNORM;
 			}
 		
@@ -359,43 +152,9 @@ namespace vkglTF
 				delete[] buffer;
 			}
 
-
-
-
-
-
 			// Upload the transfer data to the GPU resources
 			SDL_GPUCommandBuffer* uploadCmdBuf = SDL_AcquireGPUCommandBuffer(this->device->logicalDevice);
 			SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(uploadCmdBuf);
-
-			//SDL_UploadToGPUBuffer(
-			//	copyPass,
-			//	&(SDL_GPUTransferBufferLocation) {
-			//		.transfer_buffer = bufferTransferBuffer,
-			//		.offset = 0
-			//	},
-			//	&(SDL_GPUBufferRegion) {
-			//		.buffer = VertexBuffer,
-			//		.offset = 0,
-			//		.size = sizeof(PositionTextureVertex) * 4
-			//	},
-			//	false
-			//);
-
-			//SDL_UploadToGPUBuffer(
-			//	copyPass,
-			//	&(SDL_GPUTransferBufferLocation) {
-			//		.transfer_buffer = bufferTransferBuffer,
-			//		.offset = sizeof(PositionTextureVertex) * 4
-			//	},
-			//	&(SDL_GPUBufferRegion) {
-			//		.buffer = IndexBuffer,
-			//		.offset = 0,
-			//		.size = sizeof(Uint16) * 6
-			//	},
-			//	false
-			//);
-
 
 			SDL_GPUTextureCreateInfo textureCreateInfo{
 				.type = SDL_GPU_TEXTURETYPE_2D,
@@ -413,10 +172,6 @@ namespace vkglTF
 				view,
 				"glTF Texture"
 			);
-
-
-
-
 
 			SDL_GPUTextureTransferInfo textureTransferInfo{
 				.transfer_buffer = textureTransferBuffer,
@@ -439,181 +194,8 @@ namespace vkglTF
 
 			SDL_EndGPUCopyPass(copyPass);
 			SDL_SubmitGPUCommandBuffer(uploadCmdBuf);
-			//SDL_DestroySurface(imageData);
-			//SDL_ReleaseGPUTransferBuffer(this->device->logicalDevice, bufferTransferBuffer);
 			SDL_ReleaseGPUTransferBuffer(this->device->logicalDevice, textureTransferBuffer);
-
-
-
-
-		//	VkImageCreateInfo imageCreateInfo{};
-		//	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		//	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-		//	imageCreateInfo.format = format;
-		//	imageCreateInfo.mipLevels = mipLevels;
-		//	imageCreateInfo.arrayLayers = 1;
-		//	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		//	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		//	imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-		//	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		//	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		//	imageCreateInfo.extent = { width, height, 1 };
-		//	imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		//	VK_CHECK_RESULT(vkCreateImage(device->logicalDevice, &imageCreateInfo, nullptr, &image));
-		//	vkGetImageMemoryRequirements(device->logicalDevice, image, &memReqs);
-		//	memAllocInfo.allocationSize = memReqs.size;
-		//	memAllocInfo.memoryTypeIndex = device->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		//	VK_CHECK_RESULT(vkAllocateMemory(device->logicalDevice, &memAllocInfo, nullptr, &deviceMemory));
-		//	VK_CHECK_RESULT(vkBindImageMemory(device->logicalDevice, image, deviceMemory, 0));
-		//
-		//	SDL_GPUCommandBuffer* copyCmd = device->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
-		//
-		//	VkImageSubresourceRange subresourceRange = {};
-		//	subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		//	subresourceRange.levelCount = 1;
-		//	subresourceRange.layerCount = 1;
-		//
-		//	{
-		//		VkImageMemoryBarrier imageMemoryBarrier{};
-		//		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		//		imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		//		imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		//		imageMemoryBarrier.srcAccessMask = 0;
-		//		imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		//		imageMemoryBarrier.image = image;
-		//		imageMemoryBarrier.subresourceRange = subresourceRange;
-		//		vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
-		//	}
-		//
-		//	VkBufferImageCopy bufferCopyRegion = {};
-		//	bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		//	bufferCopyRegion.imageSubresource.mipLevel = 0;
-		//	bufferCopyRegion.imageSubresource.baseArrayLayer = 0;
-		//	bufferCopyRegion.imageSubresource.layerCount = 1;
-		//	bufferCopyRegion.imageExtent.width = width;
-		//	bufferCopyRegion.imageExtent.height = height;
-		//	bufferCopyRegion.imageExtent.depth = 1;
-		//
-		//	vkCmdCopyBufferToImage(copyCmd, stagingBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferCopyRegion);
-		//
-		//	{
-		//		VkImageMemoryBarrier imageMemoryBarrier{};
-		//		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		//		imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		//		imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-		//		imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		//		imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-		//		imageMemoryBarrier.image = image;
-		//		imageMemoryBarrier.subresourceRange = subresourceRange;
-		//		vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
-		//	}
-		//
-		//	device->flushCommandBuffer(copyCmd, copyQueue, true);
-		//
-		//	vkFreeMemory(device->logicalDevice, stagingMemory, nullptr);
-		//	vkDestroyBuffer(device->logicalDevice, stagingBuffer, nullptr);
-		//
-		//	// Generate the mip chain (glTF uses jpg and png, so we need to create this manually)
-		//	SDL_GPUCommandBuffer* blitCmd = device->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
-		//	for (uint32_t i = 1; i < mipLevels; i++) {
-		//		VkImageBlit imageBlit{};
-		//
-		//		imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		//		imageBlit.srcSubresource.layerCount = 1;
-		//		imageBlit.srcSubresource.mipLevel = i - 1;
-		//		imageBlit.srcOffsets[1].x = int32_t(width >> (i - 1));
-		//		imageBlit.srcOffsets[1].y = int32_t(height >> (i - 1));
-		//		imageBlit.srcOffsets[1].z = 1;
-		//
-		//		imageBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		//		imageBlit.dstSubresource.layerCount = 1;
-		//		imageBlit.dstSubresource.mipLevel = i;
-		//		imageBlit.dstOffsets[1].x = int32_t(width >> i);
-		//		imageBlit.dstOffsets[1].y = int32_t(height >> i);
-		//		imageBlit.dstOffsets[1].z = 1;
-		//
-		//		VkImageSubresourceRange mipSubRange = {};
-		//		mipSubRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		//		mipSubRange.baseMipLevel = i;
-		//		mipSubRange.levelCount = 1;
-		//		mipSubRange.layerCount = 1;
-		//
-		//		{
-		//			VkImageMemoryBarrier imageMemoryBarrier{};
-		//			imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		//			imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		//			imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		//			imageMemoryBarrier.srcAccessMask = 0;
-		//			imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		//			imageMemoryBarrier.image = image;
-		//			imageMemoryBarrier.subresourceRange = mipSubRange;
-		//			vkCmdPipelineBarrier(blitCmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
-		//		}
-		//
-		//		vkCmdBlitImage(blitCmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageBlit, SDL_GPU_FILTER_LINEAR);
-		//
-		//		{
-		//			VkImageMemoryBarrier imageMemoryBarrier{};
-		//			imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		//			imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		//			imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-		//			imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		//			imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-		//			imageMemoryBarrier.image = image;
-		//			imageMemoryBarrier.subresourceRange = mipSubRange;
-		//			vkCmdPipelineBarrier(blitCmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
-		//		}
-		//	}
-		//
-		//	subresourceRange.levelCount = mipLevels;
-		//	imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		//
-		//	{
-		//		VkImageMemoryBarrier imageMemoryBarrier{};
-		//		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		//		imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-		//		imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		//		imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		//		imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-		//		imageMemoryBarrier.image = image;
-		//		imageMemoryBarrier.subresourceRange = subresourceRange;
-		//		vkCmdPipelineBarrier(blitCmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
-		//	}
-		//
-		//	device->flushCommandBuffer(blitCmd, copyQueue, true);
 		}
-
-		//VkSamplerCreateInfo samplerInfo{};
-		//samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		//samplerInfo.magFilter = textureSampler.magFilter;
-		//samplerInfo.minFilter = textureSampler.minFilter;
-		//samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		//samplerInfo.addressModeU = textureSampler.addressModeU;
-		//samplerInfo.addressModeV = textureSampler.addressModeV;
-		//samplerInfo.addressModeW = textureSampler.addressModeW;
-		//samplerInfo.compareOp = VK_COMPARE_OP_NEVER;
-		//samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		//samplerInfo.maxAnisotropy = 1.0;
-		//samplerInfo.anisotropyEnable = VK_FALSE;
-		//samplerInfo.maxLod = (float)mipLevels;
-		//samplerInfo.maxAnisotropy = 8.0f;
-		//samplerInfo.anisotropyEnable = VK_TRUE;
-		//VK_CHECK_RESULT(vkCreateSampler(device->logicalDevice, &samplerInfo, nullptr, &sampler));
-		//
-		//VkImageViewCreateInfo viewInfo{};
-		//viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		//viewInfo.image = image;
-		//viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		//viewInfo.format = format;
-		//viewInfo.components = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
-		//viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		//viewInfo.subresourceRange.layerCount = 1;
-		//viewInfo.subresourceRange.levelCount = mipLevels;
-		//VK_CHECK_RESULT(vkCreateImageView(device->logicalDevice, &viewInfo, nullptr, &view));
-		//
-		//descriptor.sampler = sampler;
-		//descriptor.imageView = view;
-		//descriptor.imageLayout = imageLayout;
 
 		SDL_GPUSamplerCreateInfo samplerCreateInfo{
 			.min_filter = textureSampler.minFilter,
@@ -991,7 +573,7 @@ namespace vkglTF
 						vert.pos = glm::vec4(glm::make_vec3(&bufferPos[v * posByteStride]), 1.0f);
 						vert.normal = glm::normalize(glm::vec3(bufferNormals ? glm::make_vec3(&bufferNormals[v * normByteStride]) : glm::vec3(0.0f)));
 						vert.uv0 = bufferTexCoordSet0 ? glm::make_vec2(&bufferTexCoordSet0[v * uv0ByteStride]) : glm::vec2(0.0f);
-						// vert.uv1 = bufferTexCoordSet1 ? glm::make_vec2(&bufferTexCoordSet1[v * uv1ByteStride]) : glm::vec2(0.0f); // PRECHECKIN: bring back
+						// vert.uv1 = bufferTexCoordSet1 ? glm::make_vec2(&bufferTexCoordSet1[v * uv1ByteStride]) : glm::vec2(0.0f); // NOTE: this and color not implemented in this sample
 
 
 						if (hasSkin)
@@ -1487,25 +1069,27 @@ namespace vkglTF
 				(*err) += "Invalid file size : " + filepath +
 									" (does the path point to a directory?)";
 			}
+			SDL_CloseIO(f);
 			return false;
 		} else if (sz == 0) {
 			if (err) {
 				(*err) += "File is empty : " + filepath + "\n";
 			}
+			SDL_CloseIO(f);
 			return false;
 		}
 
 		out->resize(sz);
 		SDL_ReadIO(f, out->data(), sz);
 
-		SDL_CloseIO(f); // PRECHECKIN: use scope exit
+		SDL_CloseIO(f);
 
 		return true;
 	}
 
 	bool SDL_impl_WriteWholeFile(std::string *err, const std::string &filepath,	const std::vector<unsigned char> &contents, void *)
 	{
-		assert(false); // PRECHECKIN: no need to impl?
+		assert(false); // NOTE: not ported in this sample, not used
 		return false;
 		//std::ofstream f(UTF8ToWchar(filepath).c_str(), std::ofstream::binary);
 		//if (!f) {
@@ -1577,7 +1161,6 @@ namespace vkglTF
 				// So we need to initialize that transcoder once
 				if (extension == "KHR_texture_basisu") {
 					std::cout << "basisu not currently supported\n";
-					// std::cout << "Model uses KHR_texture_basisu, initializing basisu transcoder\n";
 					// basist::basisu_transcoder_init();
 				}
 			}
@@ -1631,27 +1214,22 @@ namespace vkglTF
 
 		struct StagingBuffer {
 			SDL_GPUTransferBuffer* buffer;
-			// VkDeviceMemory memory;
 		} vertexStaging, indexStaging;
 
 		// Create staging buffers
 		// Vertex data
 		device->createTransferBuffer(
 			SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-			/*VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,*/
 			vertexBufferSize,
 			&vertexStaging.buffer,
-			/*&vertexStaging.memory,*/
 			loaderInfo.vertexBuffer);
 
 		// Index data
 		if (indexBufferSize > 0) {
 			device->createTransferBuffer(
 				SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-				/*VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,*/
 				indexBufferSize,
 				&indexStaging.buffer,
-				/*&indexStaging.memory,*/
 				loaderInfo.indexBuffer);
 		}
 
@@ -1659,31 +1237,22 @@ namespace vkglTF
 		// Vertex buffer
 		device->createBuffer(
 			SDL_GPU_BUFFERUSAGE_VERTEX,
-			/*VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,*/
 			vertexBufferSize,
-			&vertices.buffer/*,
-			&vertices.memory*/);
+			&vertices.buffer);
 
 		// Index buffer
 		if (indexBufferSize > 0) {
 			device->createBuffer(
 				SDL_GPU_BUFFERUSAGE_INDEX,
-				/*VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,*/
 				indexBufferSize,
-				&indices.buffer/*,
-				&indices.memory*/);
+				&indices.buffer);
 		}
-
 
 
 		// Copy from staging buffers
 		SDL_GPUCommandBuffer* copyCmd = SDL_AcquireGPUCommandBuffer(device->logicalDevice);
 		SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(copyCmd);
 
-		// VkBufferCopy copyRegion = {};
-		//
-		// copyRegion.size = vertexBufferSize;
-		// vkCmdCopyBuffer(copyCmd, vertexStaging.buffer, vertices.buffer, 1, &copyRegion);
 		{
 			SDL_GPUTransferBufferLocation transferBufferLocation {
 				.transfer_buffer = vertexStaging.buffer,
@@ -1699,38 +1268,27 @@ namespace vkglTF
 			SDL_UploadToGPUBuffer(copyPass, &transferBufferLocation, &localBufferLocation, false);
 		}
 
-
-
 		if (indexBufferSize > 0) {
-			// copyRegion.size = indexBufferSize;
-			// vkCmdCopyBuffer(copyCmd, indexStaging.buffer, indices.buffer, 1, &copyRegion);
+			SDL_GPUTransferBufferLocation transferBufferLocation {
+				.transfer_buffer = indexStaging.buffer,
+				.offset = 0
+			};
 
-			{
-				SDL_GPUTransferBufferLocation transferBufferLocation {
-					.transfer_buffer = indexStaging.buffer,
-					.offset = 0
-				};
+			SDL_GPUBufferRegion localBufferLocation {
+				.buffer = indices.buffer,
+				.offset = 0,
+				.size = indexBufferSize
+			};
 
-				SDL_GPUBufferRegion localBufferLocation {
-					.buffer = indices.buffer,
-					.offset = 0,
-					.size = indexBufferSize
-				};
-
-				SDL_UploadToGPUBuffer(copyPass, &transferBufferLocation, &localBufferLocation, false);
-			}
+			SDL_UploadToGPUBuffer(copyPass, &transferBufferLocation, &localBufferLocation, false);
 		}
 
 		// device->flushCommandBuffer(copyCmd, transferQueue, true);
 		SDL_EndGPUCopyPass(copyPass);
 		SDL_SubmitGPUCommandBuffer(copyCmd);
 
-		// vkDestroyBuffer(device->logicalDevice, vertexStaging.buffer, nullptr);
-		// vkFreeMemory(device->logicalDevice, vertexStaging.memory, nullptr);
 		SDL_ReleaseGPUTransferBuffer(device->logicalDevice, vertexStaging.buffer);
 		if (indexBufferSize > 0) {
-			// vkDestroyBuffer(device->logicalDevice, indexStaging.buffer, nullptr);
-			// vkFreeMemory(device->logicalDevice, indexStaging.memory, nullptr);
 			SDL_ReleaseGPUTransferBuffer(device->logicalDevice, indexStaging.buffer);
 		}
 

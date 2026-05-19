@@ -11,19 +11,13 @@
 #pragma once
 
 #include <exception>
-#include <assert.h>
-#include <algorithm>
 #include <cstring>
-#include <vector>
-//#include "vulkan/vulkan.h" // PETEHUF_TODO: remove
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_gpu.h"
 
-//#include "macros.h"
-
 namespace vks
 {
-	struct VulkanDevice
+	struct VulkanDevice // PRECHECKIN: cleanup mentions of Vulkan
 	{
 		SDL_Window* window;
 		// VkPhysicalDevice physicalDevice;

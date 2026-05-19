@@ -68,16 +68,11 @@ namespace vkglTF
 
 	struct Texture {
 		vks::VulkanDevice *device;
-		// SDL_Surface* image;
-		// VkImageLayout imageLayout;
-		// VkDeviceMemory deviceMemory;
-		SDL_GPUTexture* /*VkImageView*/ view;
+		SDL_GPUTexture* view;
 		uint32_t width, height;
 		uint32_t mipLevels;
 		uint32_t layerCount;
-		// VkDescriptorImageInfo descriptor;
 		SDL_GPUSampler *sampler;
-		void updateDescriptor();
 		void destroy();
 		void fromglTfImage(tinygltf::Image& gltfimage, std::string path, TextureSampler textureSampler, vks::VulkanDevice* device);
 	};
@@ -209,7 +204,7 @@ namespace vkglTF
 			glm::vec3 pos;
 			glm::vec3 normal;
 			glm::vec2 uv0;
-			//glm::vec2 uv1; // PRECHECKIN: bring these back
+			//glm::vec2 uv1; // NOTE: uv1, color not used in this example
 			glm::uvec4 joint0;
 			glm::vec4 weight0;
 			//glm::vec4 color;
@@ -217,11 +212,9 @@ namespace vkglTF
 
 		struct Vertices {
 			SDL_GPUBuffer* buffer = nullptr;
-			//VkDeviceMemory memory;
 		} vertices;
 		struct Indices {
 			SDL_GPUBuffer* buffer = nullptr;
-			//VkDeviceMemory memory;
 		} indices;
 
 		glm::mat4 aabb;
@@ -249,10 +242,6 @@ namespace vkglTF
 			size_t vertexPos = 0;
 		};
 
-		//std::vector<uint32_t> indexBufferHackyStorage{}; // PRECHECKIN: cleanup
-		//std::vector<Vertex> vertexBufferHackyStorage{};
-
-
 		std::string filePath;
 
 		void destroy(SDL_GPUDevice* device);
@@ -266,8 +255,8 @@ namespace vkglTF
 		void loadMaterials(tinygltf::Model& gltfModel);
 		void loadAnimations(tinygltf::Model& gltfModel);
 		void loadFromFile(std::string filename, vks::VulkanDevice* device, float scale = 1.0f);
-		void drawNode(Node* node, /*SDL_GPUCommandBuffer* commandBuffer*/ SDL_GPURenderPass* renderPass);
-		void draw(/*SDL_GPUCommandBuffer* commandBuffer*/ SDL_GPURenderPass* renderPass);
+		void drawNode(Node* node, SDL_GPURenderPass* renderPass);
+		void draw(SDL_GPURenderPass* renderPass);
 		void calculateBoundingBox(Node* node, Node* parent);
 		void getSceneDimensions();
 		void updateAnimation(uint32_t index, float time);

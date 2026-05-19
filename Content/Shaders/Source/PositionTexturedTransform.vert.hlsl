@@ -14,9 +14,8 @@ struct MeshShaderDataBlock
     uint jointCount;
 };
 
-cbuffer PushConstants : register(b1, space1) // PRECHECKIN: equivalent to push constants, mesh data should be moved to StorageBuffer, equiv to SSBO
+cbuffer PushConstants : register(b1, space1)
 {
-    //MeshShaderDataBlock meshData;
     int meshIndex;
 };
 
@@ -46,36 +45,26 @@ Output main(Input input)
     
     Output output;
     output.TexCoord = input.TexCoord;
-    output.Position = mul(transform, float4(input.Position, 1.0f));
-    output.Normal = mul(model, float4(input.Normal, 1.0f));
-    
-    
-    
+
     if (MeshData[meshIndex].jointCount > 0)
     {
-		// Mesh is skinned
+        // Mesh is skinned
         float4x4 skinMat =
-			input.Weight.x * MeshData[meshIndex].jointMatrix[input.Joint.x] +
-			input.Weight.y * MeshData[meshIndex].jointMatrix[input.Joint.y] +
-			input.Weight.z * MeshData[meshIndex].jointMatrix[input.Joint.z] +
-			input.Weight.w * MeshData[meshIndex].jointMatrix[input.Joint.w];
+            input.Weight.x * MeshData[meshIndex].jointMatrix[input.Joint.x] +
+            input.Weight.y * MeshData[meshIndex].jointMatrix[input.Joint.y] +
+            input.Weight.z * MeshData[meshIndex].jointMatrix[input.Joint.z] +
+            input.Weight.w * MeshData[meshIndex].jointMatrix[input.Joint.w];
 
-        //output.Position = output.Position = mul(mul(transform, skinMat), float4(input.Position, 1.0f));
-        
-        output.Position = output.Position = mul(mul(transform, mul(MeshData[meshIndex].mat, skinMat)), float4(input.Position, 1.0f));
-
-        //output.Position = mul(mul(mul(model, meshData.mat), skinMat), float4(input.Position, 1.0));
-        //outNormal = normalize(transpose(inverse(mat3(model * meshData.mat * skinMat))) * input.Normal);
+        output.Position = mul(mul(transform, mul(MeshData[meshIndex].mat, skinMat)), float4(input.Position, 1.0f));
+        output.Normal = normalize(mul(mul(model, mul(MeshData[meshIndex].mat, skinMat)), float4(input.Normal, 1.0f)));
+        //outNormal = normalize(transpose(inverse(mat3(model * meshData.mat * skinMat))) * input.Normal); // NOTE: hlsl no 'inverse' function. check normal calulation math
     }
     else
     {
         output.Position = mul(mul(transform, MeshData[meshIndex].mat), float4(input.Position, 1.0));
-        //locPos = model * meshData.mat * float4(input.Position, 1.0);
-        
-        //outNormal = normalize(transpose(inverse(mat3(model * meshData.mat))) * input.Normal);
+        output.Normal = normalize(mul(mul(model, MeshData[meshIndex].mat), float4(input.Normal, 1.0)));
+        //outNormal = normalize(transpose(inverse(mat3(model * meshData.mat))) * input.Normal); // NOTE: hlsl no 'inverse' function. check normal calulation math
     }
-    
-    
-    
+
     return output;
 }
