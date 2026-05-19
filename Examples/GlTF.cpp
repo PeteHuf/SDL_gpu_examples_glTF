@@ -211,7 +211,6 @@ void createMeshDataBuffer()
 	}
 
 
-	// Build sprite instance transfer
 	ShaderMeshData* dataPtr = static_cast<ShaderMeshData*>(SDL_MapGPUTransferBuffer(
 		SmartContext->vulkanDevice->logicalDevice,
 		SmartContext->shaderMeshDataTransferBuffer,
@@ -270,38 +269,79 @@ void createMeshDataBuffer()
 	SmartContext->shaderMeshDataBufferSize = bufferSize;
 }
 
-//void updateMeshDataBuffer(uint32_t index)
-//{
-//	// @todo: optimize (no push, use fixed size)
-//	std::vector<ShaderMeshData> shaderMeshData{};
-//	for (auto& node : models.scene.linearNodes) {
-//		ShaderMeshData meshData{};
-//		if (node->mesh) {
-//			memcpy(meshData.jointMatrix, node->mesh->jointMatrix, sizeof(glm::mat4) * MAX_NUM_JOINTS);
-//			meshData.jointcount = node->mesh->jointcount;
-//			meshData.matrix = node->mesh->matrix;
-//			shaderMeshData.push_back(meshData);
-//		}
-//	}
-//
-//	VkDeviceSize bufferSize = shaderMeshData.size() * sizeof(ShaderMeshData);
-//
-//	if (!vulkanDevice->requiresStaging) {
-//		memcpy(shaderMeshDataBuffers[index].mapped, shaderMeshData.data(), bufferSize);
-//	}
-//	else {
-//		Buffer stagingBuffer;
-//		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize, &stagingBuffer.buffer, &stagingBuffer.memory, shaderMeshData.data()));
-//		// Copy from staging buffers
-//		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
-//		VkBufferCopy copyRegion{};
-//		copyRegion.size = bufferSize;
-//		vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, shaderMeshDataBuffers[index].buffer, 1, &copyRegion);
-//		vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
-//		stagingBuffer.device = device;
-//		stagingBuffer.destroy();
-//	}
-//}
+void updateMeshDataBuffer()
+{
+	// @todo: optimize (no push, use fixed size)
+	std::vector<ShaderMeshData> shaderMeshData{};
+	for (auto& node : SmartContext->model->linearNodes) {
+		ShaderMeshData meshData{};
+		if (node->mesh) {
+			memcpy(meshData.jointMatrix, node->mesh->jointMatrix, sizeof(glm::mat4) * MAX_NUM_JOINTS);
+			meshData.jointcount = node->mesh->jointcount;
+			meshData.matrix = node->mesh->matrix;
+			shaderMeshData.push_back(meshData);
+		}
+	}
+
+	Uint32 bufferSize = shaderMeshData.size() * sizeof(ShaderMeshData);
+
+
+
+
+	SDL_GPUCommandBuffer* cmdBuf = SDL_AcquireGPUCommandBuffer(SmartContext->vulkanDevice->logicalDevice);
+	if (cmdBuf == NULL)
+	{
+		SDL_Log("AcquireGPUCommandBuffer failed: %s", SDL_GetError());
+		return;
+	}
+
+
+	ShaderMeshData* dataPtr = static_cast<ShaderMeshData*>(SDL_MapGPUTransferBuffer(
+		SmartContext->vulkanDevice->logicalDevice,
+		SmartContext->shaderMeshDataTransferBuffer,
+		true /*cycle*/
+	));
+
+	SDL_memcpy(dataPtr, shaderMeshData.data(), bufferSize);
+
+
+	SDL_UnmapGPUTransferBuffer(SmartContext->vulkanDevice->logicalDevice, SmartContext->shaderMeshDataTransferBuffer);
+
+	// Upload instance data
+	SDL_GPUTransferBufferLocation transferBufferLocation{
+		.transfer_buffer = SmartContext->shaderMeshDataTransferBuffer,
+		.offset = 0
+	};
+	SDL_GPUBufferRegion bufferRegion{
+		.buffer = SmartContext->shaderMeshDataBuffer,
+		.offset = 0,
+		.size = bufferSize
+	};
+	SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(cmdBuf);
+	SDL_UploadToGPUBuffer(
+		copyPass,
+		&transferBufferLocation,
+		&bufferRegion,
+		true /*cycle*/
+	);
+	SDL_EndGPUCopyPass(copyPass);
+
+	SDL_SubmitGPUCommandBuffer(cmdBuf);
+
+
+
+
+	//Buffer stagingBuffer;
+	//VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize, &stagingBuffer.buffer, &stagingBuffer.memory, shaderMeshData.data()));
+	//// Copy from staging buffers
+	//VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+	//VkBufferCopy copyRegion{};
+	//copyRegion.size = bufferSize;
+	//vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, shaderMeshDataBuffers[index].buffer, 1, &copyRegion);
+	//vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
+	//stagingBuffer.device = device;
+	//stagingBuffer.destroy();
+}
 
 static int Init_cpp(Context* context)
 {
@@ -329,7 +369,11 @@ static int Init_cpp(Context* context)
 
 
 
-		SDL_GPUShader* sceneVertexShader = LoadShader(context->Device, "PositionTexturedTransform.vert", 0, 2, 0, 0);
+		SDL_GPUShader* sceneVertexShader = LoadShader(context->Device, "PositionTexturedTransform.vert",
+			0 /*samplerCount*/,
+			2 /*uniformBufferCount*/,
+			1 /*storageBufferCount*/,
+			0 /*storageTextureCount*/);
 		if (sceneVertexShader == NULL)
 		{
 			SDL_Log("Failed to create vertex shader!");
@@ -524,7 +568,7 @@ static int Update_cpp(Context* context)
 		}
 
 		SmartContext->model->updateAnimation(animationIndex, animationTimer);
-		//updateMeshDataBuffer(frameIndex);
+		updateMeshDataBuffer();
 	}
 
 	return 0;
@@ -558,8 +602,9 @@ struct alignas(16) MeshShaderDataBlock {
 
 static_assert(alignof(MeshShaderDataBlock) == 16, "alignof(VertexUBO) should be 16");
 
-struct alignas(16) MeshData {
-	alignas(16) MeshShaderDataBlock meshData;
+struct alignas(16) PushConstants {
+	//alignas(16) MeshShaderDataBlock meshData;
+	alignas(16) int32_t meshIndex;
 };
 
 static void render_node(vkglTF::Node& curNode, const VertexUBO& vertexUBO, SDL_GPUTexture& swapchainTexture, SDL_GPURenderPass* renderPass, float nearPlane, float farPlane, SDL_GPUCommandBuffer* cmdbuf)
@@ -616,16 +661,20 @@ static void render_node(vkglTF::Node& curNode, const VertexUBO& vertexUBO, SDL_G
 
 
 
-			MeshData meshData{};
-			meshData.meshData.matrix = curNode.mesh->matrix; // PRECHECKIN: eval
-			//meshData.meshData.matrix = curNode.getMatrix();
-			meshData.meshData.jointcount = curNode.mesh->jointcount;
-			SDL_memcpy(meshData.meshData.jointMatrix, curNode.mesh->jointMatrix, sizeof(curNode.mesh->jointMatrix));
-			static_assert(sizeof(meshData.meshData.jointMatrix) == sizeof(curNode.mesh->jointMatrix));
+			PushConstants pushConstants{};
+			pushConstants.meshIndex = curNode.mesh->index;
+
+			//MeshData meshData{};
+			//meshData.meshData.matrix = curNode.mesh->matrix; // PRECHECKIN: eval
+			////meshData.meshData.matrix = curNode.getMatrix();
+			//meshData.meshData.jointcount = curNode.mesh->jointcount;
+			//SDL_memcpy(meshData.meshData.jointMatrix, curNode.mesh->jointMatrix, sizeof(curNode.mesh->jointMatrix));
+			//static_assert(sizeof(meshData.meshData.jointMatrix) == sizeof(curNode.mesh->jointMatrix));
 
 
 			SDL_PushGPUVertexUniformData(cmdbuf, 0, &vertexUBO, sizeof(vertexUBO));
-			SDL_PushGPUVertexUniformData(cmdbuf, 1, &meshData, sizeof(meshData));
+			//SDL_PushGPUVertexUniformData(cmdbuf, 1, &meshData, sizeof(meshData));
+			SDL_PushGPUVertexUniformData(cmdbuf, 1, &pushConstants, sizeof(pushConstants));
 
 			std::array<float, 2> nearFarPlane{nearPlane, farPlane};
 			SDL_PushGPUFragmentUniformData(cmdbuf, 0, nearFarPlane.data(), 8);
@@ -808,6 +857,14 @@ static int Draw_cpp(Context* context)
 
 		SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(cmdbuf, &swapchainTargetInfo, 1, &depthStencilTargetInfo);
 		SDL_BindGPUGraphicsPipeline(renderPass, ScenePipeline);
+
+		SDL_BindGPUVertexStorageBuffers(
+			renderPass,
+			0,
+			&SmartContext->shaderMeshDataBuffer,
+			1
+		);
+
 
 		for (const auto& child : SmartContext->model->nodes) {
 			if (child != nullptr) {

@@ -5,8 +5,7 @@ cbuffer UBO : register(b0, space1)
     float4x4 projection : packoffset(c8);
 };
 
-//#define MAX_NUM_JOINTS 128
-#define MAX_NUM_JOINTS 32 // PRECHECKIN: When I make this the initial 128 the joint count gets lost on Vulcan
+#define MAX_NUM_JOINTS 128
 
 struct MeshShaderDataBlock
 {
@@ -15,10 +14,15 @@ struct MeshShaderDataBlock
     uint jointCount;
 };
 
-cbuffer MeshData : register(b1, space1) // PRECHECKIN: equivalent to push constants, mesh data should be moved to StorageBuffer, equiv to SSBO
+cbuffer PushConstants : register(b1, space1) // PRECHECKIN: equivalent to push constants, mesh data should be moved to StorageBuffer, equiv to SSBO
 {
-    MeshShaderDataBlock meshData;
+    //MeshShaderDataBlock meshData;
+    int meshIndex;
 };
+
+
+StructuredBuffer<MeshShaderDataBlock> MeshData : register(t0, space0);
+
 
 struct Input
 {
@@ -47,25 +51,25 @@ Output main(Input input)
     
     
     
-    if (meshData.jointCount > 0)
+    if (MeshData[meshIndex].jointCount > 0)
     {
 		// Mesh is skinned
         float4x4 skinMat =
-			input.Weight.x * meshData.jointMatrix[input.Joint.x] +
-			input.Weight.y * meshData.jointMatrix[input.Joint.y] +
-			input.Weight.z * meshData.jointMatrix[input.Joint.z] +
-			input.Weight.w * meshData.jointMatrix[input.Joint.w];
+			input.Weight.x * MeshData[meshIndex].jointMatrix[input.Joint.x] +
+			input.Weight.y * MeshData[meshIndex].jointMatrix[input.Joint.y] +
+			input.Weight.z * MeshData[meshIndex].jointMatrix[input.Joint.z] +
+			input.Weight.w * MeshData[meshIndex].jointMatrix[input.Joint.w];
 
         //output.Position = output.Position = mul(mul(transform, skinMat), float4(input.Position, 1.0f));
         
-        output.Position = output.Position = mul(mul(transform, mul(meshData.mat, skinMat)), float4(input.Position, 1.0f));
+        output.Position = output.Position = mul(mul(transform, mul(MeshData[meshIndex].mat, skinMat)), float4(input.Position, 1.0f));
 
         //output.Position = mul(mul(mul(model, meshData.mat), skinMat), float4(input.Position, 1.0));
         //outNormal = normalize(transpose(inverse(mat3(model * meshData.mat * skinMat))) * input.Normal);
     }
     else
     {
-        output.Position = mul(mul(transform, meshData.mat), float4(input.Position, 1.0));
+        output.Position = mul(mul(transform, MeshData[meshIndex].mat), float4(input.Position, 1.0));
         //locPos = model * meshData.mat * float4(input.Position, 1.0);
         
         //outNormal = normalize(transpose(inverse(mat3(model * meshData.mat))) * input.Normal);
