@@ -34,6 +34,14 @@ static float ClearDepth = 1.0f;
 static Uint8 ClearDepthStencil = 0;
 static SDL_FColor ClearColor{ 0.2f, 0.5f, 0.4f, 1.0f };
 
+// We use a large buffer to store all per mesh data that needs to be passed to the shader
+struct alignas(16) ShaderMeshData {
+	glm::mat4 matrix;
+	glm::mat4 jointMatrix[MAX_NUM_JOINTS]{};
+	uint32_t jointcount{ 0 };
+};
+
+
 struct SmartContext_t {
 	std::unique_ptr<vks::VulkanDevice> vulkanDevice{};
 	std::unique_ptr<vkglTF::Model> model{};
@@ -45,12 +53,24 @@ struct SmartContext_t {
 
 	vkglTF::BoundingBox aabb{};
 
+	SDL_GPUTransferBuffer* shaderMeshDataTransferBuffer{};
+	SDL_GPUBuffer* shaderMeshDataBuffer{};
+	Uint32 shaderMeshDataBufferSize{};
+
 	~SmartContext_t()
 	{
 		if (flatNormalTexture != nullptr) {
 			//SDL_ReleaseGPUSampler(this->device->logicalDevice, sampler);
 			SDL_ReleaseGPUTexture(vulkanDevice->logicalDevice, flatNormalTexture);
 
+		}
+
+		if (shaderMeshDataTransferBuffer != nullptr) {
+			SDL_ReleaseGPUTransferBuffer(vulkanDevice->logicalDevice, shaderMeshDataTransferBuffer);
+		}
+
+		if (shaderMeshDataBuffer != nullptr) {
+			SDL_ReleaseGPUBuffer(vulkanDevice->logicalDevice, shaderMeshDataBuffer);
 		}
 	}
 };
@@ -129,6 +149,159 @@ static void init_flat_normal_texture(Context* context)
 	SDL_ReleaseGPUTransferBuffer(context->Device, textureTransferBuffer);
 	SDL_DestroySurface(imageData);
 }
+
+// We place all the shader data blocks for all meshes (node) into a single buffer 
+// This allows us to use one singular allocation instead of having to do lots of small allocations per mesh
+// The vertex shader then get's the index into this buffer from a push constant set per mesh
+void createMeshDataBuffer()
+{
+	std::vector<ShaderMeshData> shaderMeshData{};
+
+	for (auto& node : SmartContext->model->linearNodes) {
+		ShaderMeshData meshData{};
+		if (node->mesh) {
+			memcpy(meshData.jointMatrix, node->mesh->jointMatrix, sizeof(glm::mat4) * MAX_NUM_JOINTS);
+			meshData.jointcount = node->mesh->jointcount;
+			meshData.matrix = node->mesh->matrix;
+			shaderMeshData.push_back(meshData);
+		}
+	}
+
+	if (SmartContext->shaderMeshDataTransferBuffer != nullptr) {
+		SDL_ReleaseGPUTransferBuffer(SmartContext->vulkanDevice->logicalDevice, SmartContext->shaderMeshDataTransferBuffer);
+	}
+
+	if (SmartContext->shaderMeshDataBuffer != nullptr) {
+		SDL_ReleaseGPUBuffer(SmartContext->vulkanDevice->logicalDevice, SmartContext->shaderMeshDataBuffer);
+	}
+
+	Uint32 bufferSize = shaderMeshData.size() * sizeof(ShaderMeshData);
+
+
+
+	SDL_GPUTransferBufferCreateInfo transferBufferCreateInfo{
+		.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+		.size = bufferSize
+	};
+	SmartContext->shaderMeshDataTransferBuffer = SDL_CreateGPUTransferBuffer(
+		SmartContext->vulkanDevice->logicalDevice,
+		&transferBufferCreateInfo
+	);
+
+	SDL_GPUBufferCreateInfo bufferCreateInfo{
+		.usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ,
+		.size = bufferSize
+	};
+	SmartContext->shaderMeshDataBuffer = SDL_CreateGPUBuffer(
+		SmartContext->vulkanDevice->logicalDevice,
+		&bufferCreateInfo
+	);
+
+
+
+
+
+
+
+	SDL_GPUCommandBuffer* cmdBuf = SDL_AcquireGPUCommandBuffer(SmartContext->vulkanDevice->logicalDevice);
+	if (cmdBuf == NULL)
+	{
+		SDL_Log("AcquireGPUCommandBuffer failed: %s", SDL_GetError());
+		return;
+	}
+
+
+	// Build sprite instance transfer
+	ShaderMeshData* dataPtr = static_cast<ShaderMeshData*>(SDL_MapGPUTransferBuffer(
+		SmartContext->vulkanDevice->logicalDevice,
+		SmartContext->shaderMeshDataTransferBuffer,
+		true /*cycle*/
+	));
+
+	SDL_memcpy(dataPtr, shaderMeshData.data(), bufferSize);
+
+
+	SDL_UnmapGPUTransferBuffer(SmartContext->vulkanDevice->logicalDevice, SmartContext->shaderMeshDataTransferBuffer);
+
+	// Upload instance data
+	SDL_GPUTransferBufferLocation transferBufferLocation{
+		.transfer_buffer = SmartContext->shaderMeshDataTransferBuffer,
+		.offset = 0
+	};
+	SDL_GPUBufferRegion bufferRegion{
+		.buffer = SmartContext->shaderMeshDataBuffer,
+		.offset = 0,
+		.size = bufferSize
+	};
+	SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(cmdBuf);
+	SDL_UploadToGPUBuffer(
+		copyPass,
+		&transferBufferLocation,
+		&bufferRegion,
+		true /*cycle*/
+	);
+	SDL_EndGPUCopyPass(copyPass);
+
+	SDL_SubmitGPUCommandBuffer(cmdBuf);
+
+
+
+	//Buffer stagingBuffer;
+	//VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize, &stagingBuffer.buffer, &stagingBuffer.memory, shaderMeshData.data()));
+	//VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize, &shaderMeshDataBuffer.buffer, &shaderMeshDataBuffer.memory));
+	//// Copy from staging buffers
+	//VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+	//VkBufferCopy copyRegion{};
+	//copyRegion.size = bufferSize;
+	//vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, shaderMeshDataBuffer.buffer, 1, &copyRegion);
+	//vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
+	//stagingBuffer.device = device;
+	//stagingBuffer.destroy();
+
+
+
+
+
+	// Update descriptor
+	//shaderMeshDataBuffer.descriptor.buffer = shaderMeshDataBuffer.buffer;
+	//shaderMeshDataBuffer.descriptor.offset = 0;
+	//shaderMeshDataBuffer.descriptor.range = bufferSize;
+	//shaderMeshDataBuffer.device = device;
+	SmartContext->shaderMeshDataBufferSize = bufferSize;
+}
+
+//void updateMeshDataBuffer(uint32_t index)
+//{
+//	// @todo: optimize (no push, use fixed size)
+//	std::vector<ShaderMeshData> shaderMeshData{};
+//	for (auto& node : models.scene.linearNodes) {
+//		ShaderMeshData meshData{};
+//		if (node->mesh) {
+//			memcpy(meshData.jointMatrix, node->mesh->jointMatrix, sizeof(glm::mat4) * MAX_NUM_JOINTS);
+//			meshData.jointcount = node->mesh->jointcount;
+//			meshData.matrix = node->mesh->matrix;
+//			shaderMeshData.push_back(meshData);
+//		}
+//	}
+//
+//	VkDeviceSize bufferSize = shaderMeshData.size() * sizeof(ShaderMeshData);
+//
+//	if (!vulkanDevice->requiresStaging) {
+//		memcpy(shaderMeshDataBuffers[index].mapped, shaderMeshData.data(), bufferSize);
+//	}
+//	else {
+//		Buffer stagingBuffer;
+//		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize, &stagingBuffer.buffer, &stagingBuffer.memory, shaderMeshData.data()));
+//		// Copy from staging buffers
+//		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+//		VkBufferCopy copyRegion{};
+//		copyRegion.size = bufferSize;
+//		vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, shaderMeshDataBuffers[index].buffer, 1, &copyRegion);
+//		vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
+//		stagingBuffer.device = device;
+//		stagingBuffer.destroy();
+//	}
+//}
 
 static int Init_cpp(Context* context)
 {
@@ -316,6 +489,8 @@ static int Init_cpp(Context* context)
 
 		init_flat_normal_texture(context);
 
+		createMeshDataBuffer();
+
 
 		const std::array<float, 6> allSides{
 			std::abs(SmartContext->aabb.min.x),
@@ -333,39 +508,6 @@ static int Init_cpp(Context* context)
 	Time = 0;
 	return 0;
 }
-
-//void updateMeshDataBuffer(uint32_t index)
-//{
-//	// @todo: optimize (no push, use fixed size)
-//	std::vector<ShaderMeshData> shaderMeshData{};
-//	for (auto& node : models.scene.linearNodes) {
-//		ShaderMeshData meshData{};
-//		if (node->mesh) {
-//			memcpy(meshData.jointMatrix, node->mesh->jointMatrix, sizeof(glm::mat4) * MAX_NUM_JOINTS);
-//			meshData.jointcount = node->mesh->jointcount;
-//			meshData.matrix = node->mesh->matrix;
-//			shaderMeshData.push_back(meshData);
-//		}
-//	}
-//
-//	VkDeviceSize bufferSize = shaderMeshData.size() * sizeof(ShaderMeshData);
-//
-//	if (!vulkanDevice->requiresStaging) {
-//		memcpy(shaderMeshDataBuffers[index].mapped, shaderMeshData.data(), bufferSize);
-//	}
-//	else {
-//		Buffer stagingBuffer;
-//		VK_CHECK_RESULT(vulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize, &stagingBuffer.buffer, &stagingBuffer.memory, shaderMeshData.data()));
-//		// Copy from staging buffers
-//		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
-//		VkBufferCopy copyRegion{};
-//		copyRegion.size = bufferSize;
-//		vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, shaderMeshDataBuffers[index].buffer, 1, &copyRegion);
-//		vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
-//		stagingBuffer.device = device;
-//		stagingBuffer.destroy();
-//	}
-//}
 
 static int Update_cpp(Context* context)
 {

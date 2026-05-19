@@ -15,7 +15,7 @@ struct MeshShaderDataBlock
     uint jointCount;
 };
 
-cbuffer MeshData : register(b1, space1)
+cbuffer MeshData : register(b1, space1) // PRECHECKIN: equivalent to push constants, mesh data should be moved to StorageBuffer, equiv to SSBO
 {
     MeshShaderDataBlock meshData;
 };
