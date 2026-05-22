@@ -141,13 +141,8 @@ if (APPLE)
         target_sources(${EXECUTABLE_NAME} PRIVATE ${FILE})
         set_property(SOURCE ${FILE} PROPERTY MACOSX_PACKAGE_LOCATION "Resources/${relpath}")
     endmacro()
-    #add_resource("${CMAKE_CURRENT_LIST_DIR}/src/Inter-VariableFont.ttf")
-    #add_resource("${CMAKE_CURRENT_LIST_DIR}/src/the_entertainer.ogg")
-    #add_resource("${CMAKE_CURRENT_LIST_DIR}/src/gs_tiger.svg")
 
     foreach(item IN LISTS ASSETS_LIST)
-        #message(STATUS "Processing: ${item}")
-        #add_resource("${CMAKE_CURRENT_LIST_DIR}/src/Inter-VariableFont.ttf")
         add_resource(${item})
     endforeach()
 else()
@@ -170,16 +165,11 @@ else()
         endif()
         add_custom_command(POST_BUILD
             TARGET "${EXECUTABLE_NAME}"
-		#    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_LIST_DIR}/src/${filename}" "${outname}"
 		    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_LIST_DIR}/${filename}" "${outname}"
 	    )
     endmacro()
-    #copy_helper("Inter-VariableFont.ttf")
-    #copy_helper("the_entertainer.ogg")
-    #copy_helper("gs_tiger.svg")
+
     foreach(item IN LISTS ASSETS_LIST)
-        #message(STATUS "Processing: ${item}")
-        #add_resource("${CMAKE_CURRENT_LIST_DIR}/src/Inter-VariableFont.ttf")
         copy_helper(${item})
     endforeach()
 endif()
