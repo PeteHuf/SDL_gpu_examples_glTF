@@ -17,7 +17,9 @@
 
 namespace vks
 {
-	struct VulkanDevice // PRECHECKIN: cleanup mentions of Vulkan
+	// NOTE: this is actually backed by SDL in this version, not necessarily Vulkan.
+	// I've kept the names to make this port easier to compare to the source by Sascha Willems.
+	struct VulkanDevice
 	{
 		SDL_Window* window;
 		// VkPhysicalDevice physicalDevice;

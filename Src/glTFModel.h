@@ -14,7 +14,6 @@
 #include <fstream>
 #include <vector>
 
-//#include "vulkan/vulkan.h" // PETEHUF_TODO: remove
 #include "VulkanDevice.hpp"
 
 #define GLM_FORCE_RADIANS
