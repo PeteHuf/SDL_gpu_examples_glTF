@@ -140,7 +140,9 @@ namespace vkglTF
 				&transferBufferCreateInfo
 			);
 
-			Uint8* textureTransferPtr = static_cast<Uint8*>(SDL_MapGPUTransferBuffer( // PRECHECKIN: correct type? 16? use gltfimage.bits?
+			assert(gltfimage.bits == 8); // following code may need to be adjusted if this is not the case. casting to Uint8
+
+			Uint8* textureTransferPtr = static_cast<Uint8*>(SDL_MapGPUTransferBuffer(
 				this->device->logicalDevice,
 				textureTransferBuffer,
 				false

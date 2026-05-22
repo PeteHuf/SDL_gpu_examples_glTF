@@ -302,22 +302,6 @@ static int Init_cpp(Context* context)
 
 	// Creates the Shaders & Pipelines
 	{
-		//SDL_GPUShader* sceneVertexShader = LoadShader(context->Device, "PositionColorTransform.vert", 0, 1, 0, 0);
-		//if (sceneVertexShader == nullptr)
-		//{
-		//	SDL_Log("Failed to create 'PositionColorTransform' vertex shader!");
-		//	return -1;
-		//}
-
-		//SDL_GPUShader* sceneFragmentShader = LoadShader(context->Device, "SolidColorDepth.frag", 0, 1, 0, 0); // PRECHECKIN: cleanup model selection
-		//if (sceneFragmentShader == nullptr)
-		//{
-		//	SDL_Log("Failed to create 'SolidColorDepth' fragment shader!");
-		//	return -1;
-		//}
-
-
-
 		SDL_GPUShader* sceneVertexShader = LoadShader(context->Device, "PositionTexturedTransform.vert",
 			0 /*samplerCount*/,
 			2 /*uniformBufferCount*/,
@@ -339,8 +323,6 @@ static int Init_cpp(Context* context)
 			SDL_Log("Failed to create fragment shader!");
 			return -1;
 		}
-
-
 
 
 		std::array<SDL_GPUVertexBufferDescription, 1> sceneVertexBufferDescription{{{
@@ -466,12 +448,9 @@ static int Init_cpp(Context* context)
         
 		SmartContext->vulkanDevice = std::make_unique<vks::VulkanDevice>(context->Device, context->Window);
 		SmartContext->model = std::make_unique<vkglTF::Model>();
-		//SmartContext->model->loadFromFile(basePath + "Content/Models/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
-		//SmartContext->model->loadFromFile(basePath + "Content/Models/Box/glTF-Embedded/Box.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
-		//SmartContext->model->loadFromFile(basePath + "Content/Models/green_cube/glTF/green_cube.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
-		SmartContext->model->loadFromFile(basePath + "Content/Models/Dumpy_normals/glTF/dumpy_norm.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 
-		// PRECHECKIN: cleanup model selection
+		// NOTE: these two samples demonstrate skinned and transform animation
+		SmartContext->model->loadFromFile(basePath + "Content/Models/Dumpy_normals/glTF/dumpy_norm.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 		//SmartContext->model->loadFromFile(basePath + "Content/Models/Dumpy_bread/glTF/dump_bread_float.gltf", SmartContext->vulkanDevice.get(), 1.0f /*scale*/);
 
 
@@ -504,7 +483,7 @@ static int Init_cpp(Context* context)
 
 static int Update_cpp(Context* context)
 {
-	static int32_t animationIndex = 0; // PRECHECKIN: hack
+	static int32_t animationIndex = 0; // NOTE: hard-coded to play the first animation
 	static float animationTimer = 0.0f;
 
 

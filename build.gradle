@@ -33,7 +33,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-/* // PRECHECKIN: this wasn't working, I guess applicationVariants is deprecated, unsure of the ramifications
+/* // NOTE: this wasn't working, I guess applicationVariants is deprecated, unsure of the ramifications
     applicationVariants.all { variant ->
         tasks["merge${variant.name.capitalize()}Assets"]
             .dependsOn("externalNativeBuild${variant.name.capitalize()}")
